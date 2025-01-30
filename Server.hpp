@@ -1,6 +1,4 @@
-#ifndef SERVER_HPP
-#define SERVER_HPP
-
+#pragma once
 #include <string>
 #include <vector>
 
@@ -11,12 +9,10 @@ public:
     void run();
 
 private:
-    int _port;
-    std::string _password;
-    int _serverSocket;
-    std::vector<int> _clients;
+    int m_port;
+    std::string m_password;
+    int m_serverSocket;
+    std::vector<int> m_clients;
 
     bool setupSocket();
 };
-
-#endif
