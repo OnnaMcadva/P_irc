@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <poll.h> 
 
 class Server {
 public:
@@ -15,4 +16,6 @@ private:
     std::vector<int> m_clients;
 
     bool setupSocket();
+    void handleNewConnection(std::vector<pollfd>& fds);
+    void handleClientData(int clientSocket, std::vector<pollfd>& fds);
 };

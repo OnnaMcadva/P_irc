@@ -5,7 +5,9 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <cstring>
-#include <unistd.h>
+#include <fcntl.h> 
+#include <poll.h> 
+#include <cerrno> 
 
 Server::Server(int port, const std::string& password) 
     : m_port(port), m_password(password), m_serverSocket(-1) {}
@@ -18,79 +20,108 @@ bool Server::initialize() {
 void Server::run() {
     std::cout << "Server is running...\n";
 
-    while (true) {
-        struct sockaddr_in clientAddr;
-        socklen_t clientLen = sizeof(clientAddr);
+    std::vector<pollfd> fds;
 
-        int clientSocket = accept(m_serverSocket, (struct sockaddr *)&clientAddr, &clientLen);
-        if (clientSocket < 0) {
-            std::cerr << "Error: Failed to accept client connection\n";
+    pollfd serverFd;
+    serverFd.fd = m_serverSocket;
+    serverFd.events = POLLIN; 
+    fds.push_back(serverFd);
+
+    while (true) {
+        int ret = poll(fds.data(), fds.size(), 100);
+        if (ret < 0) {
+            std::cerr << "Error: poll failed\n";
+            break;
+        } else if (ret == 0) {
             continue;
         }
 
-        std::cout << "New client connected: " << inet_ntoa(clientAddr.sin_addr)
-                  << ":" << ntohs(clientAddr.sin_port) << "\n";
-
-        // Обработка клиента в цикле
-        while (true) {
-            char buffer[1024];
-            ssize_t bytesRead = read(clientSocket, buffer, sizeof(buffer) - 1);
-
-            if (bytesRead <= 0) { // Разрыв соединения
-                std::cout << "Client disconnected.\n";
-                break;
+        for (size_t i = 0; i < fds.size(); ++i) {
+            if (fds[i].revents & POLLIN) {
+                if (fds[i].fd == m_serverSocket) {
+                    handleNewConnection(fds);
+                } else {
+                    handleClientData(fds[i].fd, fds);
+                }
             }
-
-            buffer[bytesRead] = '\0';
-            std::cout << "Received message: " << buffer << "\n";
-
-            std::string response = "Message received: ";
-            response += buffer;
-            send(clientSocket, response.c_str(), response.length(), 0);
         }
-
-        close(clientSocket);
     }
 }
 
+void Server::handleNewConnection(std::vector<pollfd>& fds) {
+    struct sockaddr_in clientAddr;
+    socklen_t clientLen = sizeof(clientAddr);
 
-// void Server::run() {
-//     std::cout << "Server is running...\n";
+    int clientSocket = accept(m_serverSocket, (struct sockaddr *)&clientAddr, &clientLen);
+    if (clientSocket < 0) {
+        std::cerr << "Error: Failed to accept client connection\n";
+        return;
+    }
 
-//     while (true) {
-//         struct sockaddr_in clientAddr;
-//         socklen_t clientLen = sizeof(clientAddr);
+    if (fcntl(clientSocket, F_SETFL, O_NONBLOCK) < 0) {
+        std::cerr << "Error: fcntl failed to set non-blocking mode for client\n";
+        close(clientSocket);
+        return;
+    }
 
-//         int clientSocket = accept(m_serverSocket, (struct sockaddr *)&clientAddr, &clientLen);
-//         if (clientSocket < 0) {
-//             std::cerr << "Error: Failed to accept client connection\n";
-//             continue;
-//         }
+    pollfd clientFd;
+    clientFd.fd = clientSocket;
+    clientFd.events = POLLIN;
+    fds.push_back(clientFd);
 
-//         m_clients.push_back(clientSocket);
+    std::cout << "New client connected: " << inet_ntoa(clientAddr.sin_addr)
+              << ":" << ntohs(clientAddr.sin_port) << "\n";
+}
 
-//         std::cout << "New client connected: " << inet_ntoa(clientAddr.sin_addr)
-//                   << ":" << ntohs(clientAddr.sin_port) << "\n";
+void Server::handleClientData(int clientSocket, std::vector<pollfd>& fds) {
+    char buffer[1024];
 
-//         char buffer[1024];
-//         ssize_t bytesRead = read(clientSocket, buffer, sizeof(buffer) - 1);
-//         if (bytesRead > 0) {
-//             buffer[bytesRead] = '\0';
-//             std::cout << "Received message: " << buffer << "\n";
-            
-//             std::string response = "Message received: ";
-//             response += buffer;
-//             send(clientSocket, response.c_str(), response.length(), 0);
-//         }
+    for (size_t i = 0; i < fds.size(); ++i) {
+        if (fds[i].fd == clientSocket) {
+            if (fds[i].revents & POLLIN) {
+                ssize_t bytesRead = read(clientSocket, buffer, sizeof(buffer) - 1);
 
-//         close(clientSocket);
-//     }
-// }
+                if (bytesRead <= 0) {
+                    std::cout << "Client disconnected.\n";
+                    close(clientSocket);
+
+                    fds.erase(fds.begin() + i);
+                    return;
+                } else {
+                    buffer[bytesRead] = '\0';
+                    std::cout << "Received message: " << buffer << "\n";
+
+                    if (strncmp(buffer, "QUIT", 4) == 0) {
+                        std::cout << "Client requested to quit.\n";
+                        close(clientSocket);
+                        fds.erase(fds.begin() + i);
+                        return;
+                    } else if (strncmp(buffer, "NICK", 4) == 0) {
+                        std::string nickname(buffer + 5);
+                        std::cout << "Client set nickname: " << nickname << "\n";
+                        std::string response = "Nickname set to: " + nickname;
+                        send(clientSocket, response.c_str(), response.length(), 0);
+                    } else {
+                        std::string response = "Message received: ";
+                        response += buffer;
+                        send(clientSocket, response.c_str(), response.length(), 0);
+                    }
+                }
+            }
+            break;
+        }
+    }
+}
 
 bool Server::setupSocket() {
     m_serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     if (m_serverSocket < 0) {
         std::cerr << "Error: Unable to create socket\n";
+        return false;
+    }
+
+    if (fcntl(m_serverSocket, F_SETFL, O_NONBLOCK) < 0) {
+        std::cerr << "Error: fcntl failed to set non-blocking mode for server socket\n";
         return false;
     }
 
