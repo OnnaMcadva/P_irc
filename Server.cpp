@@ -64,6 +64,9 @@ void Server::handleNewConnection(std::vector<pollfd>& fds) {
         return;
     }
 
+    std::string passwordPrompt = "Enter password: ";
+    send(clientSocket, passwordPrompt.c_str(), passwordPrompt.length(), 0);
+
     pollfd clientFd;
     clientFd.fd = clientSocket;
     clientFd.events = POLLIN;
@@ -101,6 +104,43 @@ void Server::handleClientData(int clientSocket, std::vector<pollfd>& fds) {
                         std::cout << "Client set nickname: " << nickname << "\n";
                         std::string response = "Nickname set to: " + nickname;
                         send(clientSocket, response.c_str(), response.length(), 0);
+                    } else if (strncmp(buffer, "USER", 4) == 0) {
+                        std::string username(buffer + 5);
+                        std::cout << "Client set username: " << username << "\n";
+                        std::string response = "Username set to: " + username;
+                        send(clientSocket, response.c_str(), response.length(), 0);
+                    } else if (strncmp(buffer, "JOIN", 4) == 0) {
+                        std::string channelName(buffer + 5);
+                        std::cout << "Client joined channel: " << channelName << "\n";
+
+                        bool channelExists = false;
+                        for (size_t j = 0; j < channels.size(); ++j) {
+                            if (channels[j].name == channelName) {
+                                channels[j].members.push_back(clientSocket);
+                                channelExists = true;
+                                break;
+                            }
+                        }
+
+                        if (!channelExists) {
+                            Channel newChannel(channelName);
+                            newChannel.members.push_back(clientSocket);
+                            channels.push_back(newChannel);
+                        }
+
+                        std::string response = "Joined channel: " + channelName;
+                        send(clientSocket, response.c_str(), response.length(), 0);
+                    } else if (strncmp(buffer, "PRIVMSG", 7) == 0) {
+                        std::string message(buffer + 8);
+                        std::cout << "Received private message: " << message << "\n";
+
+                        for (size_t j = 0; j < channels.size(); ++j) {
+                            for (size_t k = 0; k < channels[j].members.size(); ++k) {
+                                if (channels[j].members[k] != clientSocket) {
+                                    send(channels[j].members[k], message.c_str(), message.length(), 0);
+                                }
+                            }
+                        }
                     } else {
                         std::string response = "Message received: ";
                         response += buffer;
