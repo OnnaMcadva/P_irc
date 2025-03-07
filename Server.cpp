@@ -8,6 +8,8 @@
 #include <fcntl.h> 
 #include <poll.h> 
 #include <cerrno> 
+#include <utility>
+#include <sstream>
 
 Server::Server(int port, const std::string& password) 
     : m_port(port), m_password(password), m_serverSocket(-1) {}
@@ -16,6 +18,13 @@ bool Server::initialize() {
     std::cout << "Initializing server on port " << m_port << " with password " << m_password << "\n";
     return setupSocket();
 }
+
+/* Server::run() запускает сервер и обрабатывает входящие соединения и данные от клиентов:
+    Инициализация: Добавляет серверный сокет (m_serverSocket) в массив отслеживаемых файловых дескрипторов (fds).
+    Цикл работы: Постоянно вызывает poll, чтобы мониторить активности на сокетах (новые подключения или данные от клиентов).
+    Обработка событий:
+        Если событие пришло от серверного сокета, вызывается handleNewConnection для обработки нового подключения.
+        Если событие пришло от клиентского сокета, вызывается handleClientData для обработки данных клиента.*/
 
 void Server::run() {
     std::cout << "Server is running...\n";
@@ -48,6 +57,13 @@ void Server::run() {
     }
 }
 
+/* handleNewConnection обрабатывает подключение нового клиента к серверу.
+    Принимает подключение: Использует accept, чтобы установить связь с клиентом.
+    Устанавливает неблокирующий режим: Настраивает сокет клиента в неблокирующий режим с помощью fcntl.
+    Отправляет приветственное сообщение: Запрашивает у клиента пароль с помощью send.
+    Добавляет клиента в список отслеживаемых файловых дескрипторов: Добавляет pollfd объекта клиента в массив fds для последующей работы (например, чтения данных).
+    Выводит информацию о клиенте: Логирует IP-адрес и порт нового клиента.*/
+
 void Server::handleNewConnection(std::vector<pollfd>& fds) {
     struct sockaddr_in clientAddr;
     socklen_t clientLen = sizeof(clientAddr);
@@ -66,6 +82,8 @@ void Server::handleNewConnection(std::vector<pollfd>& fds) {
 
     std::string passwordPrompt = "Enter password: ";
     send(clientSocket, passwordPrompt.c_str(), passwordPrompt.length(), 0);
+
+    m_clients.insert(std::make_pair(clientSocket, Client(clientSocket)));
 
     pollfd clientFd;
     clientFd.fd = clientSocket;
@@ -86,72 +104,138 @@ void Server::handleClientData(int clientSocket, std::vector<pollfd>& fds) {
 
                 if (bytesRead <= 0) {
                     std::cout << "Client disconnected.\n";
-                    close(clientSocket);
-
-                    fds.erase(fds.begin() + i);
+                    removeClient(clientSocket, fds);
                     return;
-                } else {
-                    buffer[bytesRead] = '\0';
-                    std::cout << "Received message: " << buffer << "\n";
+                }
 
-                    if (strncmp(buffer, "QUIT", 4) == 0) {
+                buffer[bytesRead] = '\0';
+                std::string input = buffer;
+
+                size_t pos = input.find("\r\n");
+                if (pos != std::string::npos) {
+                    input = input.substr(0, pos);
+                }
+                if (input.empty()) {
+                    return;
+                }
+
+                std::cout << "Received message: " << input << "\n";
+
+                std::map<int, Client>::iterator it = m_clients.find(clientSocket);
+                if (it == m_clients.end()) {
+                    std::cerr << "Error: Unknown client\n";
+                    removeClient(clientSocket, fds);
+                    return;
+                }
+
+                Client& client = it->second;
+
+                if (!client.passwordEntered) {
+                    if (input == m_password) {
+                        client.passwordEntered = true;
+                        std::string response = "Password accepted\n";
+                        send(clientSocket, response.c_str(), response.length(), 0);
+                    } else {
+                        client.passwordAttempts--;
+                        if (client.passwordAttempts > 0) {
+                            std::stringstream ss;
+                            ss << client.passwordAttempts;
+                            std::string response = "Wrong password. Attempts left: " + ss.str() + "\n";
+                            send(clientSocket, response.c_str(), response.length(), 0);
+                        } else {
+                            std::string response = "Too many wrong attempts. Disconnecting.\n";
+                            send(clientSocket, response.c_str(), response.length(), 0);
+                            removeClient(clientSocket, fds);
+                            close(clientSocket);
+                        }
+                    }
+                    return;
+                }
+                
+                if (strncmp(buffer, "QUIT", 4) == 0) {
                         std::cout << "Client requested to quit.\n";
+                        std::string goodbyeMessage = "Goodbye!\n";
+                        send(clientSocket, goodbyeMessage.c_str(), goodbyeMessage.length(), 0);
                         close(clientSocket);
                         fds.erase(fds.begin() + i);
+                        removeClient(clientSocket, fds);
                         return;
-                    } else if (strncmp(buffer, "NICK", 4) == 0) {
-                        std::string nickname(buffer + 5);
-                        std::cout << "Client set nickname: " << nickname << "\n";
-                        std::string response = "Nickname set to: " + nickname;
-                        send(clientSocket, response.c_str(), response.length(), 0);
-                    } else if (strncmp(buffer, "USER", 4) == 0) {
-                        std::string username(buffer + 5);
-                        std::cout << "Client set username: " << username << "\n";
-                        std::string response = "Username set to: " + username;
-                        send(clientSocket, response.c_str(), response.length(), 0);
-                    } else if (strncmp(buffer, "JOIN", 4) == 0) {
-                        std::string channelName(buffer + 5);
-                        std::cout << "Client joined channel: " << channelName << "\n";
-
-                        bool channelExists = false;
-                        for (size_t j = 0; j < channels.size(); ++j) {
-                            if (channels[j].name == channelName) {
-                                channels[j].members.push_back(clientSocket);
-                                channelExists = true;
-                                break;
-                            }
-                        }
-
-                        if (!channelExists) {
-                            Channel newChannel(channelName);
-                            newChannel.members.push_back(clientSocket);
-                            channels.push_back(newChannel);
-                        }
-
-                        std::string response = "Joined channel: " + channelName;
-                        send(clientSocket, response.c_str(), response.length(), 0);
-                    } else if (strncmp(buffer, "PRIVMSG", 7) == 0) {
-                        std::string message(buffer + 8);
-                        std::cout << "Received private message: " << message << "\n";
-
-                        for (size_t j = 0; j < channels.size(); ++j) {
-                            for (size_t k = 0; k < channels[j].members.size(); ++k) {
-                                if (channels[j].members[k] != clientSocket) {
-                                    send(channels[j].members[k], message.c_str(), message.length(), 0);
-                                }
-                            }
-                        }
-                    } else {
-                        std::string response = "Message received: ";
-                        response += buffer;
-                        send(clientSocket, response.c_str(), response.length(), 0);
-                    }
+                } else if (input.rfind("NICK", 0) == 0) {
+                    std::string nickname = input.substr(5);
+                    std::cout << "Client set nickname: " << nickname << "\n";
+                    std::string response = "Nickname set to: " + nickname + "\n";
+                    send(clientSocket, response.c_str(), response.length(), 0);
+                } else if (input.rfind("USER", 0) == 0) {
+                    std::string username = input.substr(5);
+                    std::cout << "Client set username: " << username << "\n";
+                    std::string response = "Username set to: " + username + "\n";
+                    send(clientSocket, response.c_str(), response.length(), 0);
+                } else if (input.rfind("JOIN", 0) == 0) {
+                    std::string channelName = input.substr(5);
+                    std::cout << "Client joined channel: " << channelName << "\n";
+                    joinChannel(clientSocket, channelName);
+                } else if (input.rfind("PRIVMSG", 0) == 0) {
+                    std::string message = input.substr(8);
+                    std::cout << "Received private message: " << message << "\n";
+                    broadcastMessage(clientSocket, message);
+                } else {
+                    std::string response = "Message received: " + input + "\n";
+                    send(clientSocket, response.c_str(), response.length(), 0);
                 }
             }
             break;
         }
     }
 }
+
+void Server::removeClient(int clientSocket, std::vector<pollfd>& fds) {
+    close(clientSocket);
+    for (std::vector<pollfd>::iterator it = fds.begin(); it != fds.end(); ++it) {
+        if (it->fd == clientSocket) {
+            fds.erase(it);
+            break;
+        }
+    }
+    m_clients.erase(clientSocket);
+    std::cout << "Client " << clientSocket << " removed.\n";
+}
+
+void Server::joinChannel(int clientSocket, const std::string& channelName) {
+    bool channelExists = false;
+    for (std::vector<Channel>::iterator it = channels.begin(); it != channels.end(); ++it) {
+        if (it->name == channelName) {
+            it->members.push_back(clientSocket);
+            channelExists = true;
+            break;
+        }
+    }
+
+    if (!channelExists) {
+        Channel newChannel(channelName);
+        newChannel.members.push_back(clientSocket);
+        channels.push_back(newChannel);
+    }
+
+    std::string response = "Joined channel: " + channelName + "\n";
+    send(clientSocket, response.c_str(), response.length(), 0);
+}
+
+void Server::broadcastMessage(int senderSocket, const std::string& message) {
+    for (std::vector<Channel>::iterator it = channels.begin(); it != channels.end(); ++it) {
+        for (std::vector<int>::iterator memberIt = it->members.begin(); memberIt != it->members.end(); ++memberIt) {
+            if (*memberIt != senderSocket) {
+                send(*memberIt, message.c_str(), message.length(), 0);
+            }
+        }
+    }
+}
+
+/* setupSocket настраивает серверный сокет для приёма входящих подключений. Вот её ключевые шаги:
+    Создаёт сокет: Создаёт сокет с протоколом TCP (SOCK_STREAM).
+    Устанавливает неблокирующий режим: Настраивает сокет на неблокирующий режим с помощью fcntl.
+    Позволяет повторное использование порта: Использует setsockopt с флагом SO_REUSEADDR, чтобы избежать ошибок при повторном запуске.
+    Привязывает сокет к адресу: Привязывает сокет к указанному порту (m_port) и адресу (INADDR_ANY — любые IP-адреса машины).
+    Начинает слушать: Запускает ожидание входящих подключений (listen).*/
 
 bool Server::setupSocket() {
     m_serverSocket = socket(AF_INET, SOCK_STREAM, 0);

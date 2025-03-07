@@ -10,15 +10,28 @@ int main(int argc, char **argv) {
     }
 
     int port = atoi(argv[1]);
+    if (port <= 0 || port > 65535) {
+        std::cerr << "Error: Port must be between 1 and 65535" << std::endl;
+        return 1;
+    }
     std::string password = argv[2];
+    if (password.empty()) {
+        std::cerr << "Error: Password cannot be empty" << std::endl;
+        return 1;
+    }
 
     std::cout << "Starting IRC server on port " << port << " with password: " << password << std::endl;
 
-    Server server(port, password);
-    if (!server.initialize()) {
+    try {
+        Server server(port, password);
+        if (!server.initialize()) {
+            return 1;
+        }
+        server.run();
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
         return 1;
     }
-    server.run();
 
     return 0;
 }
