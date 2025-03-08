@@ -94,6 +94,8 @@ void Server::handleNewConnection(std::vector<pollfd>& fds) {
               << ":" << ntohs(clientAddr.sin_port) << "\n";
 }
 
+/* handleClientData обрабатывает данные от клиента: читает команды (QUIT, NICK, USER, JOIN, PRIVMSG), проверяет пароль, управляет подключением.*/
+
 void Server::handleClientData(int clientSocket, std::vector<pollfd>& fds) {
     char buffer[1024];
 
