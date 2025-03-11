@@ -133,6 +133,7 @@ void Server::handleClientData(int clientSocket, std::vector<pollfd>& fds) {
                 Client& client = it->second;
 
                 if (!client.passwordEntered) {
+                    // if (input.compare(m_password) == 0)
                     if (input == m_password) {
                         client.passwordEntered = true;
                         std::string response = "Password accepted\n";
