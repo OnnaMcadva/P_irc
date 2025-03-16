@@ -1,14 +1,13 @@
-#include <cstdlib> // для atoi
+#include <cstdlib>
 #include <iostream>
 #include <string>
 #include "Server.hpp"
 
-// Проверяем, что строка — это только цифры
 bool is_valid_number(const char* str) {
-    if (!str || str[0] == '\0') // Пустая строка или nullptr
+    if (!str || str[0] == '\0')
         return false;
     for (int i = 0; str[i] != '\0'; i++) {
-        if (str[i] < '0' || str[i] > '9') // Если не цифра
+        if (str[i] < '0' || str[i] > '9')
             return false;
     }
     return true;
@@ -51,3 +50,12 @@ int main(int argc, char **argv) {
 
     return 0;
 }
+
+/*
+PASS jopa
+NICK anna
+USER anna 0 * :Anna VM
+JOIN #test
+PRIVMSG #test :hello
+QUIT
+*/

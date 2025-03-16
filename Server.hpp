@@ -6,13 +6,16 @@
 
 class Client {
     public:
-        int fd;
-        bool passwordEntered;
-        int passwordAttempts;
-        Client(int fd) : fd(fd), passwordEntered(false), passwordAttempts(3) {}
-        Client() : passwordEntered(false), passwordAttempts(3) {}
+        Client(int socket) 
+            : socket(socket), passwordEntered(false), passwordAttempts(3), nickname(""), username("") {}
+        Client() 
+            : socket(-1), passwordEntered(false), passwordAttempts(3), nickname(""), username("") {}
+        int socket;           // Номер сокета клиента
+        bool passwordEntered; // Прошёл ли проверку пароля
+        int passwordAttempts; // Сколько попыток осталось
+        std::string nickname; // Ник клиента
+        std::string username; // Юзернейм клиента
     };
-
 
 class Channel {
 public:

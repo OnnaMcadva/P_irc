@@ -1,0 +1,94 @@
+annavm@annavm-Lenovo:~/Documents/42/P_irc$ ./ircserv 6667 jopa
+Starting IRC server on port 6667 with password: jopa
+Initializing server on port 6667 with password jopa
+Server is listening on port 6667
+Server is running...
+New client connected: 127.0.0.1:41082
+New client connected: 127.0.0.1:41084
+Received message: jopa
+Client authenticated with password: jopa
+Received message: jopa
+Client authenticated with password: jopa
+New client connected: 127.0.0.1:35930
+Received message: popa
+Received message: kopa
+Received message: jopa
+Client authenticated with password: jopa
+Received message: QUIT
+Client requested to quit.
+Client 6 removed.
+Received message: NICK anna
+Client set nickname: anna
+Received message: NICK KUKU
+Client set nickname: KUKU
+Received message: USER anna 0 * :AnyaMc
+Client set username: anna
+Received message: USER KUKU 0 * :KUKUXA
+Client set username: KUKU
+Received message: JOIN #test
+Client joined channel: #test
+Received message: JOIN #test
+Client joined channel: #test
+Received message: PRIVMSG #test :hello
+Received private message to #test : hello
+Received message: PRIVMSG #test :hello sam
+Received private message to #test : hello sam
+Received message: QUIT
+Client requested to quit.
+Client 4 removed.
+Received message: QUIT
+Client requested to quit.
+Client 5 removed.
+^C
+
+
+annavm@annavm-Lenovo:~/Documents/42/P_irc$ nc -C 127.0.0.1 6667
+Enter password: jopa
+:server 001 guest4 :Welcome to the IRC server
+NICK anna
+:server 001 anna :Nickname set
+USER anna 0 * :AnyaMc
+:server 001 anna :Welcome to the IRC server anna!
+JOIN #test
+Joined channel: #test
+:anna JOIN #test
+PRIVMSG #test :hello
+:server 001 anna :Message sent
+:KUKU PRIVMSG #test :hello sam
+QUIT
+:server 221 anna :Goodbye
+QUIT
+nc: write failed (0/2): Broken pipe
+
+
+annavm@annavm-Lenovo:~/Documents/42/P_irc$ nc -C 127.0.0.1 6667
+Enter password: jopa
+:server 001 guest5 :Welcome to the IRC server
+NICK KUKU
+:server 001 KUKU :Nickname set
+USER KUKU 0 * :KUKUXA
+:server 001 KUKU :Welcome to the IRC server KUKU!
+JOIN #test
+Joined channel: #test
+:KUKU JOIN #test
+:anna JOIN #test
+:anna PRIVMSG #test :hello
+PRIVMSG #test :hello sam            
+:server 001 KUKU :Message sent
+QUIT
+:server 221 KUKU :Goodbye
+QUIT
+nc: write failed (0/2): Broken pipe
+
+
+annavm@annavm-Lenovo:~/Documents/42/P_irc$ nc -C 127.0.0.1 6667
+Enter password: popa
+:server 464 guest6 :Wrong password. Attempts left: 2
+kopa
+:server 464 guest6 :Wrong password. Attempts left: 1
+jopa
+:server 001 guest6 :Welcome to the IRC server
+QUIT
+:server 221  :Goodbye
+QUIT
+nc: write failed (0/2): Broken pipe
