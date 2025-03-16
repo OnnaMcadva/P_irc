@@ -9,11 +9,19 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    int port = atoi(argv[1]);
+    int port;
+    try {
+        port = std::stoi(argv[1]); // Превращаем строку в число
+    } catch (const std::exception& e) {
+        std::cerr << "Error: Port must be a valid number" << std::endl;
+        return 1;
+    }
+
     if (port <= 0 || port > 65535) {
         std::cerr << "Error: Port must be between 1 and 65535" << std::endl;
         return 1;
     }
+
     std::string password = argv[2];
     if (password.empty()) {
         std::cerr << "Error: Password cannot be empty" << std::endl;
