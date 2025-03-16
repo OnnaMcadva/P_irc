@@ -1,7 +1,18 @@
-#include <cstdlib>
+#include <cstdlib> // для atoi
 #include <iostream>
 #include <string>
 #include "Server.hpp"
+
+// Проверяем, что строка — это только цифры
+bool is_valid_number(const char* str) {
+    if (!str || str[0] == '\0') // Пустая строка или nullptr
+        return false;
+    for (int i = 0; str[i] != '\0'; i++) {
+        if (str[i] < '0' || str[i] > '9') // Если не цифра
+            return false;
+    }
+    return true;
+}
 
 int main(int argc, char **argv) {
     if (argc != 3) {
@@ -9,14 +20,11 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    int port;
-    try {
-        port = std::stoi(argv[1]); // Превращаем строку в число
-    } catch (const std::exception& e) {
+    if (!is_valid_number(argv[1])) {
         std::cerr << "Error: Port must be a valid number" << std::endl;
         return 1;
     }
-
+    int port = atoi(argv[1]);
     if (port <= 0 || port > 65535) {
         std::cerr << "Error: Port must be between 1 and 65535" << std::endl;
         return 1;
