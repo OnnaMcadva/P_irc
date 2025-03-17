@@ -44,4 +44,5 @@ private:
     void removeClient(int clientSocket, std::vector<pollfd>& fds);
     void joinChannel(int clientSocket, const std::string& channelName);
     void broadcastMessage(int senderSocket, const std::string& message);
+    void processInput(int clientSocket, const std::string& input, std::vector<pollfd>& fds, size_t i);
 };
