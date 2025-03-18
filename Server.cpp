@@ -105,7 +105,6 @@ void Server::run() {
             outputBuffers.erase(clientSocket);
             return;
         }
-    
         Client& client = it->second;
         if (!client.passwordEntered) {
             // Проверяем, начинается ли строка с "PASS "
@@ -169,6 +168,11 @@ void Server::run() {
                 outputBuffers.erase(clientSocket);
                 return;
             } else if (input.rfind("NICK", 0) == 0) {
+                if (input.length() <= 5) {
+                    std::string response = ":server 461 " + client.nickname + " NICK :Not enough parameters\r\n";
+                    send(clientSocket, response.c_str(), response.length(), 0);
+                    return;
+                }
                 std::string nickname = input.substr(5);
                 while (!nickname.empty() && (nickname[0] == ' ' || nickname[nickname.length() - 1] == ' ')) {
                     if (nickname[0] == ' ') nickname.erase(0, 1);
@@ -200,6 +204,11 @@ void Server::run() {
                     }
                 }
             } else if (input.rfind("USER", 0) == 0) {
+                if (input.length() <= 5) {
+                    std::string response = ":server 461 " + client.nickname + " USER :Not enough parameters\r\n";
+                    send(clientSocket, response.c_str(), response.length(), 0);
+                    return;
+                }
                 std::istringstream iss(input.substr(5));
                 std::string username, mode, unused, realname;
                 iss >> username >> mode >> unused;
@@ -228,6 +237,11 @@ void Server::run() {
                     fds[i].events |= POLLOUT;
                 }
             } else if (input.rfind("JOIN", 0) == 0) {
+                if (input.length() <= 5) {
+                    std::string response = ":server 461 " + client.nickname + " JOIN :Not enough parameters\r\n";
+                    send(clientSocket, response.c_str(), response.length(), 0);
+                    return;
+                }
                 std::string channelName = input.substr(5);
                 while (!channelName.empty() && (channelName[0] == ' ' || channelName[channelName.length() - 1] == ' ')) {
                     if (channelName[0] == ' ') channelName.erase(0, 1);
@@ -246,6 +260,11 @@ void Server::run() {
                     broadcastMessage(clientSocket, "JOIN " + channelName);
                 }
             } else if (input.rfind("PRIVMSG", 0) == 0) {
+                if (input.length() <= 5) {
+                    std::string response = ":server 461 " + client.nickname + " PRIVMSG :Not enough parameters\r\n";
+                    send(clientSocket, response.c_str(), response.length(), 0);
+                    return;
+                }
                 size_t spacePos = input.find(' ');
                 size_t colonPos = input.find(':');
                 if (spacePos != std::string::npos && colonPos != std::string::npos && colonPos > spacePos) {
