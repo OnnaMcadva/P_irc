@@ -1,5 +1,4 @@
-#ifndef SERVER_HPP
-#define SERVER_HPP
+#pragma once
 
 #include <string>
 #include <vector>
@@ -32,5 +31,3 @@ private:
 
     friend class CommandHandler;
 };
-
-#endif
