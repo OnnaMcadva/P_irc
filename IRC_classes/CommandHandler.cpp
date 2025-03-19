@@ -217,6 +217,23 @@ void CommandHandler::processCommand(int clientSocket, const std::string& input, 
     }
 }
 
+/* Функция `broadcastMessage` обрабатывает команды `PRIVMSG` и `JOIN`,
+отправляя сообщения всем участникам указанного канала, кроме отправителя.  
+
+1. **Разбирает входное сообщение:**  
+   - Извлекает команду (`PRIVMSG` или `JOIN`).  
+   - Определяет целевой канал (`target`).  
+   - Если это `PRIVMSG`, извлекает текст сообщения.  
+
+2. **Находит канал в списке `server.channels`**  
+   - Если канал найден, получает список его участников.  
+
+3. **Отправляет сообщение всем участникам, кроме отправителя:**  
+   - Для `PRIVMSG`: пересылает текст от имени отправителя.  
+   - Для `JOIN`: уведомляет о присоединении нового пользователя.  
+
+Фактически, функция реализует рассылку сообщений в рамках IRC-канала. */
+
 void CommandHandler::broadcastMessage(int senderSocket, const std::string& message) {
     size_t firstSpace = message.find(' ');
     if (firstSpace == std::string::npos) return;
