@@ -2,6 +2,8 @@
 #include <iostream>
 #include <cstdlib>
 
+/* Конструктор Config инициализирует объект с номером порта и паролем. */
+
 Config::Config(int p, const std::string& pw) {
     if (p <= 0 || p > 65535) {
         std::cerr << "Error: Port must be between 1 and 65535" << std::endl;
