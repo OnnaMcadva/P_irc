@@ -28,12 +28,13 @@ Server::~Server() {
 
 bool Server::initialize() {
     std::cout << "Initializing server on port " << config.getPort() << " with password " << config.getPassword() << "\n";
-    signal(SIGINT, Server::signalHandler);
+    signal(SIGINT, Server::signalHandler);  /* Защита от Ctrl+C или от kill -INT <pid> */
     return setupSocket();
 }
 
 void Server::signalHandler(int sig) {
-    if (sig == SIGINT) {
+    if (sig == SIGINT)
+    {
         shouldStop = true;
     }
 }
@@ -130,6 +131,7 @@ void Server::run() {
 
 bool Server::setupSocket() {
     m_serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    /* AF_INET (IPv4) если есть Wi-Fi (192.168.1.1) и localhost (127.0.0.1) [AF_INET6 (IPv6)], сервер будет слушать оба, SOCK_STREAM Transmission Control Protocol — протокол управления передачей) */
     if (m_serverSocket < 0) {
         std::cerr << "Error: Unable to create socket\n";
         return false;
