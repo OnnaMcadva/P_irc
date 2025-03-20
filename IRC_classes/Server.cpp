@@ -158,7 +158,7 @@ bool Server::setupSocket() {
 
     if (bind(m_serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0) /* привязка сокета к порту и адресу */
     {
-        std::cerr << "Error: bind failed\n";
+        std::cerr << "Error: bind failed, reason: " << strerror(errno) << "\n";
         return false;
     }
 
