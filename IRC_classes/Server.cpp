@@ -163,7 +163,7 @@ bool Server::setupSocket() {
     }
 
     if (listen(m_serverSocket, 10) < 0) {
-        std::cerr << "Error: listen failed\n";
+        std::cerr << "Error: listen failed, reason: " << strerror(errno) << "\n";
         return false;
     }
 
