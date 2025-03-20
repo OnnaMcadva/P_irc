@@ -156,7 +156,8 @@ bool Server::setupSocket() {
     serverAddr.sin_addr.s_addr = INADDR_ANY; /* любой IP-адрес с компа */
     serverAddr.sin_port = htons(config.getPort()); /* host to network short переводит в спец интернет-формат */
 
-    if (bind(m_serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0) {
+    if (bind(m_serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0) /* привязка сокета к порту и адресу */
+    {
         std::cerr << "Error: bind failed\n";
         return false;
     }
