@@ -228,3 +228,18 @@
                     std::cout << "Client set nickname: " + nickname + "\n";
                     // Ничего не отправляем, ждем USER для полной регистрации
 ```
+// Было (строки 53–59):
+```cpp
+            std::cout << "Client authenticated with password: " << password << "\n";
+            char buffer[16];
+            sprintf(buffer, "%d", clientSocket);
+            std::string clientName = client.getNickname().empty() ? "guest" + std::string(buffer) : client.getNickname();
+            std::string response = ":server 001 " + clientName + " :Welcome to the IRC server\r\n";
+            std::cout << "Response to send: " << response << std::endl;
+            client.appendOutputBuffer(response);
+```
+// Станет:
+```cpp
+            std::cout << "Client authenticated with password: " << password << "\n";
+            // Больше ничего не отправляем, просто ждем NICK и USER
+```
