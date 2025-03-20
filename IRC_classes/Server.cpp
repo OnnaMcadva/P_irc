@@ -131,7 +131,7 @@ void Server::run() {
 
 bool Server::setupSocket() {
     m_serverSocket = socket(AF_INET, SOCK_STREAM, 0);
-    /* AF_INET (IPv4) если есть Wi-Fi (192.168.1.1) и localhost (127.0.0.1) [AF_INET6 (IPv6)], сервер будет слушать оба, SOCK_STREAM Transmission Control Protocol — протокол управления передачей) */
+    /* AF_INET (IPv4) если есть Wi-Fi (192.168.1.1) и localhost (127.0.0.1) [или AF_INET6 (IPv6)], сервер будет слушать оба, SOCK_STREAM Transmission Control Protocol — протокол управления передачей) */
     if (m_serverSocket < 0) {
         std::cerr << "Error: Unable to create socket\n";
         return false;
