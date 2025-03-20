@@ -55,10 +55,10 @@ void Server::run() {
 
     std::vector<pollfd> fds;
     pollfd serverFd;
-    serverFd.fd = m_serverSocket;
-    serverFd.events = POLLIN;
-    serverFd.revents = 0; // Явно инициализируем
-    fds.push_back(serverFd);
+    serverFd.fd = m_serverSocket; /* файловый дескриптор, который нужно мониторить */
+    serverFd.events = POLLIN; /* ключевое событие для обработки входящих сообщений и команд */
+    serverFd.revents = 0; /* события, которые произошли (заполняется системой) */
+    fds.push_back(serverFd); /* первый сокет добавлен. это собственно сам сервер */
 
     while (!shouldStop) {
         int ret = poll(fds.data(), fds.size(), 100);
