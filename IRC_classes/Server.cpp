@@ -1,5 +1,5 @@
 #include "Server.hpp"
-#include "CommandHandler.hpp" // Полное определение CommandHandler здесь
+#include "CommandHandler.hpp"
 #include <iostream>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -10,12 +10,17 @@
 #include <poll.h>
 #include <cerrno>
 #include <utility>
+#include <signal.h>
+#include <stdexcept>
+
+// Инициализация статической переменной
+bool Server::shouldStop = false;
 
 Server::Server(const Config& cfg)
     : m_serverSocket(-1), config(cfg), cmdHandler(new CommandHandler(*this)) {}
 
 Server::~Server() {
-    delete cmdHandler; // Освобождаем память
+    delete cmdHandler;
     if (m_serverSocket != -1) {
         close(m_serverSocket);
     }
@@ -23,7 +28,14 @@ Server::~Server() {
 
 bool Server::initialize() {
     std::cout << "Initializing server on port " << config.getPort() << " with password " << config.getPassword() << "\n";
+    signal(SIGINT, Server::signalHandler);
     return setupSocket();
+}
+
+void Server::signalHandler(int sig) {
+    if (sig == SIGINT) {
+        shouldStop = true;
+    }
 }
 
 /* Функция `run()` запускает сервер и обрабатывает входящие соединения и данные от клиентов.  
@@ -44,13 +56,18 @@ void Server::run() {
     pollfd serverFd;
     serverFd.fd = m_serverSocket;
     serverFd.events = POLLIN;
+    serverFd.revents = 0; // Явно инициализируем
     fds.push_back(serverFd);
 
-    while (true) {
+    while (!shouldStop) {
         int ret = poll(fds.data(), fds.size(), 100);
         if (ret < 0) {
-            std::cerr << "Error: poll failed\n";
-            break;
+            if (errno == EINTR) {
+                continue;
+            }
+            std::cerr << "Error: poll failed with errno " << errno << "\n";
+            shutdown();
+            return;
         } else if (ret == 0) {
             continue;
         }
@@ -64,6 +81,41 @@ void Server::run() {
                 }
             }
         }
+    }
+
+    std::cout << "\nReceived SIGINT. Choose an option:\n";
+    std::cout << "1. Shut down the server\n";
+    std::cout << "2. Restart with new port and password\n";
+    std::cout << "Enter 1 or 2: ";
+    
+    int choice = 0;
+    std::cin >> choice;
+
+    if (choice == 1) {
+        shutdown();
+        return;
+    } else if (choice == 2) {
+        std::cout << "Enter new port (1-65535): ";
+        int newPort = 0;
+        std::cin >> newPort;
+        std::cout << "Enter new password: ";
+        std::string newPassword;
+        std::cin >> newPassword;
+
+        try {
+            config.reconfigure(newPort, newPassword);
+            restart(fds);
+            shouldStop = false;
+            run();
+        } catch (const std::runtime_error& e) {
+            std::cerr << "Error: " << e.what() << "\n";
+            shutdown();
+            return;
+        }
+    } else {
+        std::cout << "Invalid choice. Shutting down...\n";
+        shutdown();
+        return;
     }
 }
 
@@ -146,6 +198,7 @@ void Server::handleNewConnection(std::vector<pollfd>& fds) {
     pollfd clientFd;
     clientFd.fd = clientSocket;
     clientFd.events = POLLIN | POLLOUT;
+    clientFd.revents = 0; // Явно инициализируем
     fds.push_back(clientFd);
 
     std::cout << "New client connected: " << inet_ntoa(clientAddr.sin_addr)
@@ -204,7 +257,7 @@ void Server::handleClientData(int clientSocket, std::vector<pollfd>& fds) {
 
                     if (!input.empty()) {
                         std::cout << "Processed input: " << input << std::endl;
-                        cmdHandler->processCommand(clientSocket, input, fds, i); // Используем указатель
+                        cmdHandler->processCommand(clientSocket, input, fds, i);
                     }
 
                     pos = m_clients[clientSocket].getInputBuffer().find("\r\n");
@@ -221,7 +274,7 @@ void Server::handleClientData(int clientSocket, std::vector<pollfd>& fds) {
                     if (!input.empty()) {
                         std::cout << "Processed input (no newline): " << input << std::endl;
                         m_clients[clientSocket].clearInputBuffer();
-                        cmdHandler->processCommand(clientSocket, input, fds, i); // Используем указатель
+                        cmdHandler->processCommand(clientSocket, input, fds, i);
                     }
                 }
             }
@@ -265,4 +318,53 @@ void Server::removeClient(int clientSocket, std::vector<pollfd>& fds) {
     }
     m_clients.erase(clientSocket);
     std::cout << "Client " << clientSocket << " removed.\n";
+}
+
+void Server::shutdown() {
+    std::cout << "Shutting down server...\n";
+    
+    for (std::map<int, Client>::iterator it = m_clients.begin(); it != m_clients.end(); ++it) {
+        close(it->first);
+    }
+    m_clients.clear();
+
+    if (m_serverSocket != -1) {
+        close(m_serverSocket);
+        m_serverSocket = -1;
+    }
+
+    channels.clear();
+
+    std::cout << "Server shutdown complete.\n";
+}
+
+void Server::restart(std::vector<pollfd>& fds) {
+    std::cout << "Restarting server with new configuration...\n";
+
+    for (std::map<int, Client>::iterator it = m_clients.begin(); it != m_clients.end(); ++it) {
+        close(it->first);
+    }
+    m_clients.clear();
+    fds.clear();
+
+    if (m_serverSocket != -1) {
+        close(m_serverSocket);
+        m_serverSocket = -1;
+    }
+
+    channels.clear();
+
+    if (!setupSocket()) {
+        std::cerr << "Failed to restart server.\n";
+        shutdown();
+        return;
+    }
+
+    pollfd serverFd;
+    serverFd.fd = m_serverSocket;
+    serverFd.events = POLLIN;
+    serverFd.revents = 0; // Явно инициализируем
+    fds.push_back(serverFd);
+
+    std::cout << "Server restarted on port " << config.getPort() << " with password " << config.getPassword() << "\n";
 }
