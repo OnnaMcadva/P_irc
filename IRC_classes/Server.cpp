@@ -38,7 +38,7 @@ void Server::signalHandler(int sig) {
         shutdown();
         return;
     }
-    if (sig == SIGINT || sig == SIGHUP) {
+    if (sig == SIGINT) {
         shouldStop = true;
     }
 }
