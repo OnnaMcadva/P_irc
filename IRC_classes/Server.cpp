@@ -137,7 +137,8 @@ bool Server::setupSocket() {
         return false;
     }
 
-    if (fcntl(m_serverSocket, F_SETFL, O_NONBLOCK) < 0) {
+    if (fcntl(m_serverSocket, F_SETFL, O_NONBLOCK) < 0) /* Неблокирующий режим: F_SETFL поменять настройки, O_NONBLOCK собственно настройка -1/0 */
+    {
         std::cerr << "Error: fcntl failed to set non-blocking mode for server socket\n";
         return false;
     }
