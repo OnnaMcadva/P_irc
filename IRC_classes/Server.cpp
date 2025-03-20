@@ -143,8 +143,9 @@ bool Server::setupSocket() {
         return false;
     }
 
-    int opt = 1;
-    if (setsockopt(m_serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+    int opt = 1; /* включить SO_REUSEADDR повторно использовать порт, что не работало у чуваков на видео */
+    if (setsockopt(m_serverSocket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) /* Socket Option Level */
+    {
         std::cerr << "Error: setsockopt failed\n";
         return false;
     }
