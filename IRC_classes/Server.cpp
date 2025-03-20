@@ -152,9 +152,9 @@ bool Server::setupSocket() {
 
     struct sockaddr_in serverAddr;
     memset(&serverAddr, 0, sizeof(serverAddr));
-    serverAddr.sin_family = AF_INET;
-    serverAddr.sin_addr.s_addr = INADDR_ANY; /* любой IP-адрес */
-    serverAddr.sin_port = htons(config.getPort());
+    serverAddr.sin_family = AF_INET; /* AF_INET интернет-адреса IPv4 */
+    serverAddr.sin_addr.s_addr = INADDR_ANY; /* любой IP-адрес с компа */
+    serverAddr.sin_port = htons(config.getPort()); /* host to network short переводит в спец интернет-формат */
 
     if (bind(m_serverSocket, (struct sockaddr *)&serverAddr, sizeof(serverAddr)) < 0) {
         std::cerr << "Error: bind failed\n";
