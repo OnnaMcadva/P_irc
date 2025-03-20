@@ -191,8 +191,9 @@
   
 ---
   
-### Проверка для Irssi
+### Правка для Irssi
 // Было (строки 159–166):
+```cpp
             client.setUsername(username);
             std::cout << "Client set username: " << username << "\n";
             if (!client.getNickname().empty()) {
@@ -201,8 +202,10 @@
                 fds[i].events |= POLLOUT;
             } else {
                 std::string response = ":server 451 * :Please set a nickname with NICK command first\r\n";
+```
 
 // Станет:
+```cpp
             client.setUsername(username);
             std::cout << "Client set username: " << username << "\n";
             if (client.isPasswordEntered() && !client.getNickname().empty()) {
@@ -211,3 +214,4 @@
                 fds[i].events |= POLLOUT;
             } else if (client.getNickname().empty()) {
                 std::string response = ":server 451 * :Please set a nickname with NICK command first\r\n";
+```
