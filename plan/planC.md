@@ -191,7 +191,7 @@
   
 ---
   
-### Правка для Irssi
+### Правка для Irssi класс CommandHandler
 // Было (строки 159–166):
 ```cpp
             client.setUsername(username);
@@ -214,4 +214,17 @@
                 fds[i].events |= POLLOUT;
             } else if (client.getNickname().empty()) {
                 std::string response = ":server 451 * :Please set a nickname with NICK command first\r\n";
+```
+// Было (строки 125–128):
+```cpp
+                    client.setNickname(nickname);
+                    std::cout << "Client set nickname: " + nickname + "\n";
+                    std::string response = ":server 001 " + nickname + " :Nickname set\r\n";
+                    client.appendOutputBuffer(response);
+```
+// Станет:
+```cpp
+                    client.setNickname(nickname);
+                    std::cout << "Client set nickname: " + nickname + "\n";
+                    // Ничего не отправляем, ждем USER для полной регистрации
 ```
