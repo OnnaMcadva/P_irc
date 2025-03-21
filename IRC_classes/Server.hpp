@@ -32,7 +32,6 @@ private:
     void handleClientData(int clientSocket, std::vector<pollfd>& fds);
     void removeClient(int clientSocket, std::vector<pollfd>& fds);
     void shutdown();
-    void restart(std::vector<pollfd>& fds);
 
     friend class CommandHandler;
 };
