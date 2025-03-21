@@ -159,6 +159,22 @@ void Server::handleNewConnection(std::vector<pollfd>& fds) {
         return;
     }
 
+    // Проверка на превышение лимита файловых дескрипторов
+    long maxFds = sysconf(_SC_OPEN_MAX);
+    if (maxFds < 0) {
+        std::cerr << "Error: Failed to get max file descriptors limit\n";
+        close(clientSocket);
+        return;
+    }
+    // Учитываем серверный сокет и минимум 3 стандартных дескриптора (stdin, stdout, stderr)
+    if (fds.size() >= static_cast<size_t>(maxFds) - 4) {
+        std::cerr << "Error: Maximum number of file descriptors reached (" << maxFds << ")\n";
+        std::cerr << "Rejecting new connection from " << inet_ntoa(clientAddr.sin_addr)
+                  << ":" << ntohs(clientAddr.sin_port) << "\n";
+        close(clientSocket);
+        return;
+    }
+
     if (fcntl(clientSocket, F_SETFL, O_NONBLOCK) < 0) {
         std::cerr << "Error: fcntl failed to set non-blocking mode for client\n";
         close(clientSocket);
