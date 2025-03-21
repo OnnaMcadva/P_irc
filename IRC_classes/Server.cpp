@@ -91,7 +91,7 @@ void Server::run() {
     std::cout << "1. Shut down the server\n";
     std::cout << "2. Restart with new port and password\n";
     std::cout << "Enter 1 or 2: ";
-    /* отсюда
+    /* отсюда */
     int choice = 0;
     std::cin >> choice;
 
