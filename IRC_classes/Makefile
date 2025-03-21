@@ -41,6 +41,9 @@ all: $(NAME)
 	@printf "⠀⠀⠀⢠⣾⣿⠿⠁⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀\n"
 	@printf "⠀⠀⣴⣿⠿⠋⠀⠀⠀"$(BLUE)"Use ./ircserv 6667 jopa\n"
 	@printf "⠀⠈⠉    "$(BLUE)"Use nc -C 127.0.0.1 6667\n\n"
+	@printf $(BOLD)$(YELLOW)"PASS :supersecret\n"
+	@printf $(BOLD)$(YELLOW)"NICK Alice\n"
+	@printf $(BOLD)$(YELLOW)"USER alice 0 * :Alice Wonderland\n"
 
 $(NAME): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $(NAME) $(OBJS)
