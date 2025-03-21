@@ -51,12 +51,12 @@ void CommandHandler::processCommand(int clientSocket, const std::string& input, 
         if (password == server.config.getPassword()) {
             client.setPasswordEntered(true);
             std::cout << "Client authenticated with password: " << password << "\n";
-            char buffer[16];
-            sprintf(buffer, "%d", clientSocket);
-            std::string clientName = client.getNickname().empty() ? "guest" + std::string(buffer) : client.getNickname();
-            std::string response = ":server 001 " + clientName + " :Welcome to the IRC server\r\n";
-            std::cout << "Response to send: " << response << std::endl;
-            client.appendOutputBuffer(response);
+            // char buffer[16];
+            // sprintf(buffer, "%d", clientSocket);
+            // std::string clientName = client.getNickname().empty() ? "guest" + std::string(buffer) : client.getNickname();
+            // std::string response = ":server 001 " + clientName + " :Welcome to the IRC server\r\n";
+            // std::cout << "Response to send: " << response << std::endl;
+            // client.appendOutputBuffer(response);
             fds[i].events |= POLLOUT;
         } else {
             client.setPasswordAttempts(client.getPasswordAttempts() - 1);
@@ -124,8 +124,8 @@ void CommandHandler::processCommand(int clientSocket, const std::string& input, 
                 } else {
                     client.setNickname(nickname);
                     std::cout << "Client set nickname: " + nickname + "\n";
-                    std::string response = ":server 001 " + nickname + " :Nickname set\r\n";
-                    client.appendOutputBuffer(response);
+                    // std::string response = ":server 001 " + nickname + " :Nickname set\r\n";
+                    // client.appendOutputBuffer(response);
                     fds[i].events |= POLLOUT;
                 }
             }
@@ -156,14 +156,23 @@ void CommandHandler::processCommand(int clientSocket, const std::string& input, 
             while (!realname.empty() && realname[0] == ' ') {
                 realname.erase(0, 1);
             }
+
             client.setUsername(username);
             std::cout << "Client set username: " << username << "\n";
-            if (!client.getNickname().empty()) {
+            if (client.isPasswordEntered() && !client.getNickname().empty()) {
                 std::string response = ":server 001 " + client.getNickname() + " :Welcome to the IRC server " + client.getNickname() + "!\r\n";
                 client.appendOutputBuffer(response);
                 fds[i].events |= POLLOUT;
-            } else {
+            } else if (client.getNickname().empty()) {
                 std::string response = ":server 451 * :Please set a nickname with NICK command first\r\n";
+            // client.setUsername(username);
+            // std::cout << "Client set username: " << username << "\n";
+            // if (!client.getNickname().empty()) {
+            //     std::string response = ":server 001 " + client.getNickname() + " :Welcome to the IRC server " + client.getNickname() + "!\r\n";
+            //     client.appendOutputBuffer(response);
+            //     fds[i].events |= POLLOUT;
+            // } else {
+            //     std::string response = ":server 451 * :Please set a nickname with NICK command first\r\n";
                 client.appendOutputBuffer(response);
                 fds[i].events |= POLLOUT;
             }
