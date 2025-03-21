@@ -68,8 +68,8 @@
 
 **Что нужно исправить:**
 - Обработка `PRIVMSG` не различает личные сообщения и сообщения в канал — нужно добавить проверку, является ли цель (`target`) каналом или пользователем.
+- !!! S etim nado razobratsya. Potomu chto seychas PASS u menya rabotaet normalno. I ya ne ponimayu chto ispravlyat zdes....
 - В `processCommand` при обработке пароля используется `rfind("PASS ", 0)`, но это не стандарт IRC — клиенты обычно отправляют просто `PASS <password>`.
-- S etim nado razobratsya. Potomu chto seychas PASS u menya rabotaet normalno. I ya ne ponimayu chto ispravlyat zdes....
 - Повторная отправка пароля после авторизации игнорируется, но лучше отправить клиенту сообщение об ошибке.
 
 **Что нужно добавить:**
