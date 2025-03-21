@@ -96,6 +96,17 @@
 
   
 ### Правка для Irssi класс CommandHandler
+
+Закомментила эти куски, вроде работают. Но если тестировать с ошибками ввода, то косячат...
+
+По идее вот так должно быть в  IRC
+
+PASS :supersecret
+NICK Alice
+USER alice 0 * :Alice Wonderland
+
+
+
 // Было (строки 159–166):
 ```cpp
             client.setUsername(username);
