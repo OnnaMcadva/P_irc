@@ -40,8 +40,8 @@ void CommandHandler::processCommand(int clientSocket, const std::string& input, 
 
     if (!client.isPasswordEntered()) {
         std::string password = input;
-        if (input.rfind("PASS ", 0) == 0) {
-            password = input.substr(5);
+        if (input.rfind("PASS :", 0) == 0) {
+            password = input.substr(6);
         }
         while (!password.empty() && (password[0] == ' ' || password[password.length() - 1] == ' ')) {
             if (password[0] == ' ') password.erase(0, 1);
@@ -88,8 +88,8 @@ void CommandHandler::processCommand(int clientSocket, const std::string& input, 
 
         if (strncmp(input.c_str(), "QUIT", 4) == 0) {
             std::cout << "Client requested to quit.\n";
-            std::string goodbyeMessage = ":server 221 " + client.getNickname() + " :Goodbye\r\n";
-            client.appendOutputBuffer(goodbyeMessage);
+            // std::string goodbyeMessage = ":server 221 " + client.getNickname() + " :Goodbye\r\n";
+            // client.appendOutputBuffer(goodbyeMessage);
             fds[i].events |= POLLOUT;
             server.removeClient(clientSocket, fds);
             return;
