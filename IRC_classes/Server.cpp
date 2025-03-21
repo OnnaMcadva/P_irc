@@ -91,7 +91,7 @@ void Server::run() {
     std::cout << "1. Shut down the server\n";
     std::cout << "2. Restart with new port and password\n";
     std::cout << "Enter 1 or 2: ";
-    
+    /* отсюда
     int choice = 0;
     std::cin >> choice;
 
@@ -102,6 +102,29 @@ void Server::run() {
         std::cout << "Enter new port (1-65535): ";
         int newPort = 0;
         std::cin >> newPort;
+/* это надо будет протестировать еще */
+    
+//     std::cin.clear();
+//     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+
+//     int choice;
+//     if (!(std::cin >> choice)) {
+//         std::cerr << "Invalid input. Shutting down...\n";
+//         shutdown();
+//         return;
+//     }
+
+//     if (choice == 1) {
+//         shutdown();
+//         return;
+//     } else if (choice == 2) {
+//         std::cout << "Enter new port (1-65535): ";
+//         int newPort;
+//         if (!(std::cin >> newPort) || newPort < 1 || newPort > 65535) {
+//             std::cerr << "Invalid port. Shutting down...\n";
+//             shutdown();
+//             return;
+//         }
         std::cout << "Enter new password: ";
         std::string newPassword;
         std::cin >> newPassword;
