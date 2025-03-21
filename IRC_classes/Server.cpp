@@ -34,10 +34,7 @@ bool Server::initialize() {
 }
 
 void Server::signalHandler(int sig) {
-    if (sig == SIGHUP) {
-        shutdown(); // надо додумать....
-    }
-    if (sig == SIGINT) {
+    if (sig == SIGINT || sig == SIGHUP) {
         shouldStop = true;
     }
 }
@@ -54,7 +51,7 @@ void Server::signalHandler(int sig) {
      - Если это **клиентский сокет** → вызывает `handleClientData(fds[i].fd, fds)`, чтобы обработать данные от клиента. */
 
 void Server::run() {
-    std::cout << "Server is running...\n";
+    std::cout << "🧠 \033[38;5;219mServer is running...\033[0m\n";
 
     std::vector<pollfd> fds;
     pollfd serverFd;
@@ -87,63 +84,9 @@ void Server::run() {
         }
     }
 
-    std::cout << "\nReceived SIGINT. Choose an option:\n";
-    std::cout << "1. Shut down the server\n";
-    std::cout << "2. Restart with new port and password\n";
-    std::cout << "Enter 1 or 2: ";
-    /* отсюда */
-    int choice = 0;
-    std::cin >> choice;
-
-    if (choice == 1) {
-        shutdown();
-        return;
-    } else if (choice == 2) {
-        std::cout << "Enter new port (1-65535): ";
-        int newPort = 0;
-        std::cin >> newPort;
-/* это надо будет протестировать еще */
-    
-//     std::cin.clear();
-//     std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
-
-//     int choice;
-//     if (!(std::cin >> choice)) {
-//         std::cerr << "Invalid input. Shutting down...\n";
-//         shutdown();
-//         return;
-//     }
-
-//     if (choice == 1) {
-//         shutdown();
-//         return;
-//     } else if (choice == 2) {
-//         std::cout << "Enter new port (1-65535): ";
-//         int newPort;
-//         if (!(std::cin >> newPort) || newPort < 1 || newPort > 65535) {
-//             std::cerr << "Invalid port. Shutting down...\n";
-//             shutdown();
-//             return;
-//         }
-        std::cout << "Enter new password: ";
-        std::string newPassword;
-        std::cin >> newPassword;
-
-        try {
-            config.reconfigure(newPort, newPassword);
-            restart(fds);
-            shouldStop = false;
-            run();
-        } catch (const std::runtime_error& e) {
-            std::cerr << "Error: " << e.what() << "\n";
-            shutdown();
-            return;
-        }
-    } else {
-        std::cout << "Invalid choice. Shutting down...\n";
-        shutdown();
-        return;
-    }
+    std::cout << "\n✨ \033[38;5;227mShutting down server...\033[0m\n ✨";
+    shutdown();
+    return;
 }
 
 /* Функция `setupSocket()` настраивает серверный сокет для работы.   
@@ -375,8 +318,6 @@ void Server::removeClient(int clientSocket, std::vector<pollfd>& fds) {
 }
 
 void Server::shutdown() {
-    std::cout << "Shutting down server...\n";
-    
     for (std::map<int, Client>::iterator it = m_clients.begin(); it != m_clients.end(); ++it) {
         close(it->first);
     }
@@ -389,36 +330,6 @@ void Server::shutdown() {
 
     channels.clear();
 
-    std::cout << "Server shutdown complete.\n";
-}
-
-void Server::restart(std::vector<pollfd>& fds) {
-    std::cout << "Restarting server with new configuration...\n";
-
-    for (std::map<int, Client>::iterator it = m_clients.begin(); it != m_clients.end(); ++it) {
-        close(it->first);
-    }
-    m_clients.clear();
-    fds.clear();
-
-    if (m_serverSocket != -1) {
-        close(m_serverSocket);
-        m_serverSocket = -1;
-    }
-
-    channels.clear();
-
-    if (!setupSocket()) {
-        std::cerr << "Failed to restart server.\n";
-        shutdown();
-        return;
-    }
-
-    pollfd serverFd;
-    serverFd.fd = m_serverSocket;
-    serverFd.events = POLLIN;
-    serverFd.revents = 0; // Явно инициализируем
-    fds.push_back(serverFd);
-
-    std::cout << "Server restarted on port " << config.getPort() << " with password " << config.getPassword() << "\n";
+    std::cout << " \033[38;5;222mServer shutdown complete.\033[0m\n";
+    std::cout << "                               🚀\n";
 }
