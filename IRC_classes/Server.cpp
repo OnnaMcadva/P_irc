@@ -74,7 +74,7 @@ void Server::run() {
                 Client& client = m_clients[fds[i].fd];
                 std::string buffer = client.getOutputBuffer();
                 if (!buffer.empty()) {
-                    ssize_t bytesWritten = write(fds[i].fd, buffer.c_str(), buffer.size());
+                    ssize_t bytesWritten = send(fds[i].fd, buffer.c_str(), buffer.size(), 0);
                     if (bytesWritten > 0) {
                         client.eraseOutputBuffer(bytesWritten);
                         std::cout << "Bytes sent: " << bytesWritten << "\n";
