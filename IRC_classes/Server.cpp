@@ -53,9 +53,7 @@ void Server::run() {
     while (!shouldStop) {
         int ret = poll(fds.data(), fds.size(), 100);
         if (ret < 0) {
-            if (errno == EINTR) {
-                continue;
-            }
+            if (errno == EINTR) continue;
             std::cerr << "Error: poll failed with errno " << errno << "\n";
             shutdown();
             return;
@@ -63,6 +61,7 @@ void Server::run() {
             continue;
         }
 
+        std::vector<size_t> toRemove; // Индексы сокетов для удаления
         for (size_t i = 0; i < fds.size(); ++i) {
             if (fds[i].revents & POLLIN) {
                 if (fds[i].fd == m_serverSocket) {
@@ -70,6 +69,43 @@ void Server::run() {
                 } else {
                     handleClientData(fds[i].fd, fds);
                 }
+            }
+            if (fds[i].revents & POLLOUT && fds[i].fd != m_serverSocket) {
+                Client& client = m_clients[fds[i].fd];
+                std::string buffer = client.getOutputBuffer();
+                if (!buffer.empty()) {
+                    ssize_t bytesWritten = write(fds[i].fd, buffer.c_str(), buffer.size());
+                    if (bytesWritten > 0) {
+                        client.eraseOutputBuffer(bytesWritten);
+                        std::cout << "Bytes sent: " << bytesWritten << "\n";
+                    } else if (bytesWritten < 0) {
+                        std::cerr << "Error writing to client " << fds[i].fd << ": " << strerror(errno) << "\n";
+                    }
+                }
+                if (client.getOutputBuffer().empty()) {
+                    fds[i].events = POLLIN;
+                }
+            }
+            // Если клиент удалён из m_clients, помечаем сокет для удаления
+            if (fds[i].fd != m_serverSocket && m_clients.find(fds[i].fd) == m_clients.end()) {
+                toRemove.push_back(i);
+            }
+        }
+
+        // Удаляем "мёртвые" сокеты
+        for (std::vector<size_t>::reverse_iterator it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
+            std::cout << "Closing socket " << fds[*it].fd << "\n"; // Для отладки
+            close(fds[*it].fd); // Закрываем сокет
+            fds.erase(fds.begin() + *it); // Удаляем из fds
+        }
+
+        // Обновляем events для оставшихся клиентов
+        for (size_t i = 1; i < fds.size(); ++i) {
+            Client& client = m_clients[fds[i].fd];
+            if (!client.getOutputBuffer().empty()) {
+                fds[i].events = POLLIN | POLLOUT;
+            } else {
+                fds[i].events = POLLIN;
             }
         }
     }

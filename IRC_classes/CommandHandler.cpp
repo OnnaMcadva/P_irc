@@ -51,12 +51,6 @@ void CommandHandler::processCommand(int clientSocket, const std::string& input, 
         if (password == server.config.getPassword()) {
             client.setPasswordEntered(true);
             std::cout << "Client authenticated with password: " << password << "\n";
-            // char buffer[16];
-            // sprintf(buffer, "%d", clientSocket);
-            // std::string clientName = client.getNickname().empty() ? "guest" + std::string(buffer) : client.getNickname();
-            // std::string response = ":server 001 " + clientName + " :Welcome to the IRC server\r\n";
-            // std::cout << "Response to send: " << response << std::endl;
-            // client.appendOutputBuffer(response);
             fds[i].events |= POLLOUT;
         } else {
             client.setPasswordAttempts(client.getPasswordAttempts() - 1);
@@ -85,14 +79,14 @@ void CommandHandler::processCommand(int clientSocket, const std::string& input, 
             std::cout << "Ignoring repeated password input: " << input << "\n";
             return;
         }
-
         if (strncmp(input.c_str(), "QUIT", 4) == 0) {
             std::cout << "Client requested to quit.\n";
-            // std::string goodbyeMessage = ":server 221 " + client.getNickname() + " :Goodbye\r\n";
-            // client.appendOutputBuffer(goodbyeMessage);
-            fds[i].events |= POLLOUT;
+            std::string goodbyeMessage = ":server 221 " + client.getNickname() + " :Goodbye\r\n";
+            client.appendOutputBuffer(goodbyeMessage);
+            // fds[i].events |= POLLOUT;
             server.removeClient(clientSocket, fds);
             return;
+
         } else if (input.rfind("NICK", 0) == 0) {
             if (input.length() <= 5) {
                 std::string response = ":server 461 " + client.getNickname() + " NICK :Not enough parameters\r\n";
@@ -124,8 +118,6 @@ void CommandHandler::processCommand(int clientSocket, const std::string& input, 
                 } else {
                     client.setNickname(nickname);
                     std::cout << "Client set nickname: " + nickname + "\n";
-                    // std::string response = ":server 001 " + nickname + " :Nickname set\r\n";
-                    // client.appendOutputBuffer(response);
                     fds[i].events |= POLLOUT;
                 }
             }
@@ -165,14 +157,6 @@ void CommandHandler::processCommand(int clientSocket, const std::string& input, 
                 fds[i].events |= POLLOUT;
             } else if (client.getNickname().empty()) {
                 std::string response = ":server 451 * :Please set a nickname with NICK command first\r\n";
-            // client.setUsername(username);
-            // std::cout << "Client set username: " << username << "\n";
-            // if (!client.getNickname().empty()) {
-            //     std::string response = ":server 001 " + client.getNickname() + " :Welcome to the IRC server " + client.getNickname() + "!\r\n";
-            //     client.appendOutputBuffer(response);
-            //     fds[i].events |= POLLOUT;
-            // } else {
-            //     std::string response = ":server 451 * :Please set a nickname with NICK command first\r\n";
                 client.appendOutputBuffer(response);
                 fds[i].events |= POLLOUT;
             }
@@ -277,22 +261,43 @@ void CommandHandler::broadcastMessage(int senderSocket, const std::string& messa
         text = message.substr(colonPos + 1);
     }
 
-    for (std::vector<Channel>::iterator it = server.channels.begin(); it != server.channels.end(); ++it) {
-        if (it->getName() == target) {
-            std::vector<int> members = it->getMembers();
-            for (std::vector<int>::iterator memberIt = members.begin(); memberIt != members.end(); ++memberIt) {
-                if (*memberIt != senderSocket) {
-                    std::string senderNick = server.m_clients[senderSocket].getNickname();
-                    std::string response;
-                    if (command == "PRIVMSG") {
-                        response = ":" + senderNick + " PRIVMSG " + target + " :" + text + "\r\n";
-                    } else if (command == "JOIN") {
-                        response = ":" + senderNick + " JOIN " + target + "\r\n";
+    std::string senderNick = server.m_clients[senderSocket].getNickname();
+
+    if (command == "PRIVMSG") {
+        if (target[0] == '#') {
+            for (std::vector<Channel>::iterator it = server.channels.begin(); it != server.channels.end(); ++it) {
+                if (it->getName() == target) {
+                    std::vector<int> members = it->getMembers();
+                    for (std::vector<int>::iterator memberIt = members.begin(); memberIt != members.end(); ++memberIt) {
+                        if (*memberIt != senderSocket) {
+                            std::string response = ":" + senderNick + " PRIVMSG " + target + " :" + text + "\r\n";
+                            server.m_clients[*memberIt].appendOutputBuffer(response);
+                        }
                     }
-                    server.m_clients[*memberIt].appendOutputBuffer(response);
+                    return; 
                 }
             }
-            break;
+        } else {
+            for (std::map<int, Client>::iterator it = server.m_clients.begin(); it != server.m_clients.end(); ++it) {
+                if (it->second.getNickname() == target && it->first != senderSocket) {
+                    std::string response = ":" + senderNick + " PRIVMSG " + target + " :" + text + "\r\n";
+                    server.m_clients[it->first].appendOutputBuffer(response);
+                    return;
+                }
+            }
+        }
+    } else if (command == "JOIN") {
+        for (std::vector<Channel>::iterator it = server.channels.begin(); it != server.channels.end(); ++it) {
+            if (it->getName() == target) {
+                std::vector<int> members = it->getMembers();
+                for (std::vector<int>::iterator memberIt = members.begin(); memberIt != members.end(); ++memberIt) {
+                    if (*memberIt != senderSocket) {
+                        std::string response = ":" + senderNick + " JOIN " + target + "\r\n";
+                        server.m_clients[*memberIt].appendOutputBuffer(response);
+                    }
+                }
+                break;
+            }
         }
     }
 }
