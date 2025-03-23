@@ -57,6 +57,7 @@ void CommandHandler::handlePassword(int clientSocket, const std::string& input, 
     }
 }
 
+/* вот эту штуку не трогаем ни при каком раскладе)) */
 void CommandHandler::handleQuit(int clientSocket, Client& client, std::vector<pollfd>& fds) {
     std::cout << "Client requested to quit.\n";
     std::string goodbyeMessage = ":server 221 " + client.getNickname() + " :Goodbye\r\n";
@@ -64,6 +65,7 @@ void CommandHandler::handleQuit(int clientSocket, Client& client, std::vector<po
     // fds[i].events |= POLLOUT;
     server.removeClient(clientSocket, fds);
 }
+/* конец сообщения */
 
 void CommandHandler::handleNick(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i) {
     if (input.length() <= 5) {
