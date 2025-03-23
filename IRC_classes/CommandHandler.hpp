@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 #include <poll.h>
-#include "Client.hpp" // Добавлено для объявления Client
+#include "Client.hpp"
 
 class Server;
 
@@ -16,7 +16,6 @@ public:
 private:
     Server& server;
 
-    // Вспомогательные функции для processCommand
     bool checkClient(int clientSocket, std::vector<pollfd>& fds, Client*& client);
     void handlePassword(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i);
     void handleQuit(int clientSocket, Client& client, std::vector<pollfd>& fds);
