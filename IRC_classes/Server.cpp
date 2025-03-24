@@ -39,7 +39,6 @@ void Server::signalHandler(int sig) {
 }
 
 /* Функция `run()` запускает сервер и обрабатывает входящие соединения и данные от клиентов. */
-
 void Server::run() {
     std::cout << "🧠 \033[38;5;219mServer is running...\033[0m\n";
 
@@ -71,7 +70,14 @@ void Server::run() {
                 }
             }
             if (fds[i].revents & POLLOUT && fds[i].fd != m_serverSocket) {
-                Client& client = m_clients[fds[i].fd];
+                std::map<int, Client>::iterator clientIt = m_clients.find(fds[i].fd);
+                if (clientIt == m_clients.end()) {
+                    std::cout << "Client " << fds[i].fd << " not found in m_clients.\n";
+                    toRemove.push_back(i);
+                    continue;
+                }
+
+                Client& client = clientIt->second;
                 std::string buffer = client.getOutputBuffer();
                 if (!buffer.empty()) {
                     ssize_t bytesWritten = send(fds[i].fd, buffer.c_str(), buffer.size(), 0);
@@ -79,11 +85,19 @@ void Server::run() {
                         client.eraseOutputBuffer(bytesWritten);
                         std::cout << "Bytes sent: " << bytesWritten << "\n";
                     } else if (bytesWritten < 0) {
-                        std::cerr << "Error writing to client " << fds[i].fd << ": " << strerror(errno) << "\n";
+                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                            std::cout << "Temporary write block for client " << fds[i].fd << ", will retry later.\n";
+                        } else {
+                            std::cerr << "Error writing to client " << fds[i].fd << ": " << strerror(errno) << "\n";
+                            toRemove.push_back(i); // Помечаем для удаления при серьёзной ошибке
+                        }
+                    } else { // bytesWritten == 0
+                        std::cout << "Client " << fds[i].fd << " closed connection.\n";
+                        toRemove.push_back(i); // Клиент закрыл соединение
                     }
                 }
                 if (client.getOutputBuffer().empty()) {
-                    fds[i].events = POLLIN;
+                    fds[i].events = POLLIN; // Снимаем POLLOUT, если буфер пуст
                 }
             }
             // Если клиент удалён из m_clients, помечаем сокет для удаления
@@ -232,7 +246,7 @@ void Server::handleNewConnection(std::vector<pollfd>& fds) {
    - Если отправка не удалась, удаляет клиента.  
    - Если буфер пуст, убирает флаг `POLLOUT`. */
 
-void Server::handleClientData(int clientSocket, std::vector<pollfd>& fds) {
+   void Server::handleClientData(int clientSocket, std::vector<pollfd>& fds) {
     char buffer[1024];
 
     for (size_t i = 0; i < fds.size(); ++i) {
@@ -249,42 +263,26 @@ void Server::handleClientData(int clientSocket, std::vector<pollfd>& fds) {
                 std::cout << "Raw data received: " << buffer << " (bytesRead: " << bytesRead << ")" << std::endl;
                 m_clients[clientSocket].appendInputBuffer(buffer);
 
-                std::cout << "Current buffer: " << m_clients[clientSocket].getInputBuffer() << std::endl;
+                std::string inputBuffer = m_clients[clientSocket].getInputBuffer(); // Копируем буфер для обработки
+                std::cout << "Current buffer: " << inputBuffer << std::endl;
 
-                size_t pos = m_clients[clientSocket].getInputBuffer().find("\r\n");
-                if (pos == std::string::npos) {
-                    pos = m_clients[clientSocket].getInputBuffer().find("\n");
-                }
+                size_t pos;
+                while ((pos = inputBuffer.find("\r\n")) != std::string::npos || (pos = inputBuffer.find("\n")) != std::string::npos) {
+                    std::string command = inputBuffer.substr(0, pos);
+                    size_t len_to_erase = (inputBuffer[pos] == '\r') ? pos + 2 : pos + 1;
+                    inputBuffer.erase(0, len_to_erase);
 
-                while (pos != std::string::npos) {
-                    std::string input = m_clients[clientSocket].getInputBuffer().substr(0, pos);
-                    size_t len_to_erase = (m_clients[clientSocket].getInputBuffer()[pos] == '\r') ? pos + 2 : pos + 1;
-                    std::string temp = m_clients[clientSocket].getInputBuffer();
-                    temp.erase(0, len_to_erase);
-                    m_clients[clientSocket].clearInputBuffer();
-                    m_clients[clientSocket].appendInputBuffer(temp);
-
-                    if (!input.empty()) {
-                        std::cout << "Processed input: " << input << std::endl;
-                        cmdHandler->processCommand(clientSocket, input, fds, i);
-                    }
-
-                    pos = m_clients[clientSocket].getInputBuffer().find("\r\n");
-                    if (pos == std::string::npos) {
-                        pos = m_clients[clientSocket].getInputBuffer().find("\n");
+                    if (!command.empty()) {
+                        std::cout << "Processed input: " << command << std::endl;
+                        cmdHandler->processCommand(clientSocket, command, fds, i);
                     }
                 }
 
-                if (!m_clients[clientSocket].getInputBuffer().empty()) {
-                    std::string input = m_clients[clientSocket].getInputBuffer();
-                    while (!input.empty() && (input[input.length() - 1] == '\r' || input[input.length() - 1] == '\n')) {
-                        input.erase(input.length() - 1);
-                    }
-                    if (!input.empty()) {
-                        std::cout << "Processed input (no newline): " << input << std::endl;
-                        m_clients[clientSocket].clearInputBuffer();
-                        cmdHandler->processCommand(clientSocket, input, fds, i);
-                    }
+                // Обновляем буфер клиента остатком
+                m_clients[clientSocket].clearInputBuffer();
+                if (!inputBuffer.empty()) {
+                    m_clients[clientSocket].appendInputBuffer(inputBuffer);
+                    std::cout << "Partial data remains in buffer: " << inputBuffer << std::endl;
                 }
             }
 
@@ -334,6 +332,12 @@ void Server::handleClientData(int clientSocket, std::vector<pollfd>& fds) {
     }
 }
 
+void Server::removeClientFromChannels(int clientSocket) {
+    for (std::vector<Channel>::iterator it = channels.begin(); it != channels.end(); ++it) {
+        it->removeMember(clientSocket);
+    }
+}
+
 /* Функция `removeClient()` удаляет клиента из сервера.   
 1. **Закрывает соединение** с клиентом (`close(clientSocket)`).  
 2. **Удаляет клиента из списка опроса (`pollfd`)**, чтобы сервер больше не следил за его событиями.  
@@ -348,6 +352,7 @@ void Server::removeClient(int clientSocket, std::vector<pollfd>& fds) {
             break;
         }
     }
+    removeClientFromChannels(clientSocket);
     m_clients.erase(clientSocket);
     std::cout << "Client " << clientSocket << " removed.\n";
 }

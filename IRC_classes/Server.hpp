@@ -30,6 +30,7 @@ private:
     bool setupSocket();
     void handleNewConnection(std::vector<pollfd>& fds);
     void handleClientData(int clientSocket, std::vector<pollfd>& fds);
+    void removeClientFromChannels(int clientSocket);
     void removeClient(int clientSocket, std::vector<pollfd>& fds);
     void shutdown();
 

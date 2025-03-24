@@ -20,6 +20,15 @@ void Channel::join(int clientSocket) {
     }
 }
 
+void Channel::removeMember(int clientSocket) {
+    for (std::vector<int>::iterator it = members.begin(); it != members.end(); ++it) {
+        if (*it == clientSocket) {
+            members.erase(it);
+            break;
+        }
+    }
+}
+
 std::string Channel::getName() const { return name; }
 
 std::vector<int> Channel::getMembers() const { return members; }

@@ -21,15 +21,21 @@ bool CommandHandler::checkClient(int clientSocket, std::vector<pollfd>& fds, Cli
 }
 
 void CommandHandler::handlePassword(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i) {
-    std::string password = input;
-    if (input.rfind("PASS :", 0) == 0) {
-        password = input.substr(6);
+    // Проверяем, начинается ли строка с "PASS :"
+    if (input.rfind("PASS :", 0) != 0) {
+        // Если это не команда PASS, просто выходим и ждём следующую команду
+        return;
     }
+
+    // Извлекаем пароль после "PASS :"
+    std::string password = input.substr(6);
+    // Убираем пробелы в начале и конце
     while (!password.empty() && (password[0] == ' ' || password[password.length() - 1] == ' ')) {
         if (password[0] == ' ') password.erase(0, 1);
         if (!password.empty() && password[password.length() - 1] == ' ') password.erase(password.length() - 1);
     }
 
+    // Проверяем пароль
     if (password == server.config.getPassword()) {
         client.setPasswordEntered(true);
         std::cout << "Client authenticated with password: " << password << "\n";

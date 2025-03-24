@@ -7,6 +7,7 @@ class Channel {
 public:
     Channel(const std::string& n);
     void join(int clientSocket);
+    void removeMember(int clientSocket);
     std::string getName() const;
     std::vector<int> getMembers() const;
 
