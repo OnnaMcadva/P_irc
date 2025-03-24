@@ -190,6 +190,23 @@ void CommandHandler::handleUser(const std::string& input, Client& client, std::v
     }
 }
 
+/* The `handleJoin` function processes the `JOIN` command sent by a client.
+It performs the following steps:
+1. Checks if the input length is sufficient:
+   - If not, a response is sent indicating that parameters are missing, and the function exits.
+2. Extracts and trims the channel name:
+   - Removes leading and trailing spaces from the channel name.
+3. Validates the channel name:
+   - If the channel name is empty or does not start with a '#', a response is sent indicating 
+     that the channel does not exist, and the function exits.
+4. Checks if the channel already exists:
+   - If it exists, adds the client to the channel's member list.
+   - If it does not exist, creates a new channel, adds the client as the first member, 
+     and registers the channel in the server's channel list.
+5. Sends a response to the client confirming the join and logs the action.
+6. Broadcasts the join message to other members of the channel.
+7. Updates the output buffer to ensure the appropriate responses are sent to the client. */
+
 void CommandHandler::handleJoin(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i) {
     if (input.length() <= 5) {
         std::string response = ":server 461 " + client.getNickname() + " JOIN :Not enough parameters\r\n";
