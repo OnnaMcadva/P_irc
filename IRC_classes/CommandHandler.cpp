@@ -88,6 +88,18 @@ void CommandHandler::handleQuit(int clientSocket, Client& client, std::vector<po
 }
 /* End of message */
 
+/* The `handleNick` function processes the `NICK` command sent by a client. 
+It performs the following steps:
+1. If the input length is less than or equal to 5, a response is sent indicating 
+   that there are not enough parameters, and the function exits.
+2. The provided nickname is extracted and trimmed of leading and trailing spaces.
+3. If the nickname is empty after trimming, a response is sent stating that 
+   no nickname was given, and the function exits.
+4. The function checks if the nickname is already in use by another client.
+   - If it is in use, a response is sent indicating that the nickname is unavailable.
+   - Otherwise, the client's nickname is updated, and a confirmation message is logged.
+5. Updates the output buffer to include the appropriate response for further communication. */
+
 void CommandHandler::handleNick(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i) {
     if (input.length() <= 5) {
         std::string response = ":server 461 " + client.getNickname() + " NICK :Not enough parameters\r\n";
@@ -123,6 +135,19 @@ void CommandHandler::handleNick(int clientSocket, const std::string& input, Clie
         }
     }
 }
+
+/* The `handleUser` function processes the `USER` command sent by a client.
+It performs the following steps:
+1. If the input length is less than or equal to 5, a response is sent to the client indicating 
+   that there are not enough parameters, and the function exits.
+2. Extracts the username and real name from the input:
+   - If the input format is incorrect (e.g., missing spaces or colon), a syntax error response is sent.
+   - Trims any leading spaces from the real name.
+3. Sets the client's username using the extracted value.
+4. Based on the client's current status:
+   - If the password is already entered and the nickname is set, a welcome message is sent.
+   - If the nickname is missing, a response is sent instructing the client to set a nickname first.
+5. Updates the output buffer with the appropriate response for further communication. */
 
 void CommandHandler::handleUser(const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i) {
     if (input.length() <= 5) {
