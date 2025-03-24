@@ -44,6 +44,15 @@ all: $(NAME)
 	@printf $(BOLD)$(YELLOW)"PASS :jopa\n"
 	@printf $(BOLD)$(YELLOW)"NICK Alice\n"
 	@printf $(BOLD)$(YELLOW)"USER alice 0 * :Alice Wonderland\n"
+	@printf $(BOLD)$(CYAN)"irssi\n"
+	@printf $(YELLOW)"/set autolog off\n"
+	@printf $(YELLOW)"/connect localhost 6667\n"
+	@printf $(YELLOW)"/quote PASS :jopa\n"
+	@printf $(YELLOW)"/quote NICK Bob\n"
+	@printf $(YELLOW)"/quote USER bob 0 * :bob\n"
+	@printf $(YELLOW)"/join #test\n"
+	@printf $(YELLOW)"/window close\n"
+	@printf $(YELLOW)"/msg Alice Привет, это личное!\n"
 
 $(NAME): $(OBJS)
 	$(CXX) $(CXXFLAGS) -o $(NAME) $(OBJS)
