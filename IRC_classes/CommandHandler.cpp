@@ -9,6 +9,13 @@
 
 CommandHandler::CommandHandler(Server& s) : server(s) {}
 
+/* The `checkClient` function verifies whether a client (identified by their socket) 
+exists in the server's list of active clients. 
+If the client does not exist, an error message is printed, 
+the client is removed from the server, and the function returns `false`. 
+If the client exists, a reference to the client object is assigned to the provided pointer, 
+and the function returns `true`. */
+
 bool CommandHandler::checkClient(int clientSocket, std::vector<pollfd>& fds, Client*& client) {
     std::map<int, Client>::iterator it = server.m_clients.find(clientSocket);
     if (it == server.m_clients.end()) {
@@ -19,6 +26,14 @@ bool CommandHandler::checkClient(int clientSocket, std::vector<pollfd>& fds, Cli
     client = &it->second;
     return true;
 }
+
+/* The `handlePassword` function processes the `PASS` command sent by a client. 
+It verifies the password provided in the command and takes appropriate actions:
+1. If the password matches the server's configured password, the client is authenticated, 
+   and the output buffer is updated for further communication.
+2. If the password is incorrect, the client is notified, and the remaining attempts 
+   are decremented. After exhausting all attempts, the client is disconnected.
+3. If the input does not start with "PASS :", the function exits without processing further. */
 
 void CommandHandler::handlePassword(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i) {
     // Проверяем, начинается ли строка с "PASS :"
@@ -63,7 +78,7 @@ void CommandHandler::handlePassword(int clientSocket, const std::string& input, 
     }
 }
 
-/* вот эту штуку не трогаем ни при каком раскладе)) */
+/* This piece of code must remain untouched under any circumstances. */
 void CommandHandler::handleQuit(int clientSocket, Client& client, std::vector<pollfd>& fds) {
     std::cout << "Client requested to quit.\n";
     std::string goodbyeMessage = ":server 221 " + client.getNickname() + " :Goodbye\r\n";
@@ -71,7 +86,7 @@ void CommandHandler::handleQuit(int clientSocket, Client& client, std::vector<po
     // fds[i].events |= POLLOUT;
     server.removeClient(clientSocket, fds);
 }
-/* конец сообщения */
+/* End of message */
 
 void CommandHandler::handleNick(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i) {
     if (input.length() <= 5) {
