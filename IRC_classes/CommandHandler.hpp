@@ -11,7 +11,7 @@ class CommandHandler {
 public:
     CommandHandler(Server& s);
     void processCommand(int clientSocket, const std::string& input, std::vector<pollfd>& fds, size_t i);
-    void broadcastMessage(int senderSocket, const std::string& message);
+    void broadcastMessage(int senderSocket, const std::string& message, std::vector<pollfd>& fds);
 
 private:
     Server& server;

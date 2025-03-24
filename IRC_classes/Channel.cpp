@@ -2,10 +2,10 @@
 
 Channel::Channel(const std::string& n) : name(n) {}
 
-/* The `join` function adds a client (by their socket) to the list of channel members 
-if they are not already in it. 
-clientSocket is the identifier of a specific client 
-connected to the server, allowing the server to know who it is communicating with. */
+/* Функция `join` добавляет клиента (по его сокету) в список участников канала,
+если его там еще нет. 
+clientSocket — это идентификатор конкретного клиента, 
+подключенного к серверу, чтобы сервер знал, с кем он общается. */
 
 void Channel::join(int clientSocket) {
     bool clientExists = false;
@@ -19,10 +19,6 @@ void Channel::join(int clientSocket) {
         members.push_back(clientSocket);
     }
 }
-
-/* The `removeMember` function removes a client (identified by their socket) 
-from the list of channel members. 
-If the client is found in the list, it is erased, and the loop exits. */
 
 void Channel::removeMember(int clientSocket) {
     for (std::vector<int>::iterator it = members.begin(); it != members.end(); ++it) {

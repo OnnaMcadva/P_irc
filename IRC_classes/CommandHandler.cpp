@@ -241,9 +241,24 @@ void CommandHandler::handleJoin(int clientSocket, const std::string& input, Clie
         std::string response = ":" + client.getNickname() + " JOIN " + channelName + "\r\n";
         client.appendOutputBuffer(response);
         fds[i].events |= POLLOUT;
-        broadcastMessage(clientSocket, "JOIN " + channelName);
+        broadcastMessage(clientSocket, "JOIN " + channelName, fds);
     }
 }
+
+/* The `handlePrivmsg` function processes the `PRIVMSG` command sent by a client.
+It performs the following actions:
+1. Checks if the input length is sufficient:
+   - If not, a response is sent indicating that the parameters are missing, and the function exits.
+2. Extracts the target (recipient) and the message:
+   - The target and message are separated by a space and a colon, respectively.
+   - Leading and trailing spaces in the target are removed.
+3. Validates the input format:
+   - If the format is correct, the message is broadcast to the target.
+   - A confirmation response is added to the client's output buffer.
+   - Logs the private message for debugging purposes.
+4. Handles incorrect input:
+   - If the recipient or message is missing, a response is sent indicating the error.
+5. Updates the output buffer to ensure the appropriate response is sent back to the client. */
 
 void CommandHandler::handlePrivmsg(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i) {
     if (input.length() <= 5) {
@@ -262,7 +277,7 @@ void CommandHandler::handlePrivmsg(int clientSocket, const std::string& input, C
         }
         std::string message = input.substr(colonPos + 1);
         std::cout << "Received private message to " << target << ": " << message << "\n";
-        broadcastMessage(clientSocket, "PRIVMSG " + target + " :" + message);
+        broadcastMessage(clientSocket, "PRIVMSG " + target + " :" + message, fds);
         std::string response = ":server 001 " + client.getNickname() + " :Message sent\r\n";
         client.appendOutputBuffer(response);
         fds[i].events |= POLLOUT;
@@ -292,6 +307,12 @@ void CommandHandler::processCommand(int clientSocket, const std::string& input, 
             std::cout << "Ignoring repeated password input: " << input << "\n";
             return;
         }
+        if (input.rfind("CAP LS", 0) == 0) {
+            std::string response = ":server CAP * LS :\r\n"; // Пустой список возможностей
+            client->appendOutputBuffer(response);
+            fds[i].events |= POLLOUT;
+            return;
+        }
         if (strncmp(input.c_str(), "QUIT", 4) == 0) {
             handleQuit(clientSocket, *client, fds);
         } else if (input.rfind("NICK", 0) == 0) {
@@ -308,7 +329,7 @@ void CommandHandler::processCommand(int clientSocket, const std::string& input, 
     }
 }
 
-void CommandHandler::broadcastMessage(int senderSocket, const std::string& message) {
+void CommandHandler::broadcastMessage(int senderSocket, const std::string& message, std::vector<pollfd>& fds) {
     size_t firstSpace = message.find(' ');
     if (firstSpace == std::string::npos) return;
     std::string command = message.substr(0, firstSpace);
@@ -323,6 +344,7 @@ void CommandHandler::broadcastMessage(int senderSocket, const std::string& messa
     }
 
     std::string senderNick = server.m_clients[senderSocket].getNickname();
+    std::string senderUser = server.m_clients[senderSocket].getUsername(); // Добавляем username????
 
     if (command == "PRIVMSG") {
         if (target[0] == '#') {
@@ -331,8 +353,14 @@ void CommandHandler::broadcastMessage(int senderSocket, const std::string& messa
                     std::vector<int> members = it->getMembers();
                     for (std::vector<int>::iterator memberIt = members.begin(); memberIt != members.end(); ++memberIt) {
                         if (*memberIt != senderSocket) {
-                            std::string response = ":" + senderNick + " PRIVMSG " + target + " :" + text + "\r\n";
+                            std::string response = ":" + senderNick + "!" + senderUser + " PRIVMSG " + target + " :" + text + "\r\n"; // Изменённый формат
                             server.m_clients[*memberIt].appendOutputBuffer(response);
+                            for (size_t i = 0; i < fds.size(); ++i) {
+                                if (fds[i].fd == *memberIt) {
+                                    fds[i].events |= POLLOUT;
+                                    break;
+                                }
+                            }
                         }
                     }
                     return; 
@@ -341,8 +369,14 @@ void CommandHandler::broadcastMessage(int senderSocket, const std::string& messa
         } else {
             for (std::map<int, Client>::iterator it = server.m_clients.begin(); it != server.m_clients.end(); ++it) {
                 if (it->second.getNickname() == target && it->first != senderSocket) {
-                    std::string response = ":" + senderNick + " PRIVMSG " + target + " :" + text + "\r\n";
+                    std::string response = ":" + senderNick + "!" + senderUser + " PRIVMSG " + target + " :" + text + "\r\n"; // Изменённый формат
                     server.m_clients[it->first].appendOutputBuffer(response);
+                    for (size_t i = 0; i < fds.size(); ++i) {
+                        if (fds[i].fd == it->first) {
+                            fds[i].events |= POLLOUT;
+                            break;
+                        }
+                    }
                     return;
                 }
             }
@@ -355,6 +389,13 @@ void CommandHandler::broadcastMessage(int senderSocket, const std::string& messa
                     if (*memberIt != senderSocket) {
                         std::string response = ":" + senderNick + " JOIN " + target + "\r\n";
                         server.m_clients[*memberIt].appendOutputBuffer(response);
+                        // Добавляем POLLOUT для этого клиента
+                        for (size_t i = 0; i < fds.size(); ++i) {
+                            if (fds[i].fd == *memberIt) {
+                                fds[i].events |= POLLOUT;
+                                break;
+                            }
+                        }
                     }
                 }
                 break;
