@@ -214,9 +214,7 @@ void Server::handleNewConnection(std::vector<pollfd>& fds) {
         return;
     }
 
-    Client newClient(clientSocket);
-    // newClient.appendOutputBuffer("Enter password: ");
-    m_clients.insert(std::pair<int, Client>(clientSocket, newClient));
+    m_clients.insert(std::make_pair(clientSocket, Client(clientSocket)));
 
     pollfd clientFd;
     clientFd.fd = clientSocket;
@@ -289,20 +287,19 @@ void Server::handleNewConnection(std::vector<pollfd>& fds) {
             if (fds[i].revents & POLLOUT) {
                 std::cout << "POLLOUT triggered for client " << clientSocket << ", buffer size: " << m_clients[clientSocket].getOutputBuffer().length() << std::endl;
                 
-                // Проверяем, существует ли клиент
                 std::map<int, Client>::iterator clientIt = m_clients.find(clientSocket);
                 if (clientIt == m_clients.end()) {
                     std::cout << "Client " << clientSocket << " not found in m_clients.\n";
                     removeClient(clientSocket, fds);
                     return;
                 }
-            
+                
                 if (clientIt->second.getOutputBuffer().empty()) {
                     fds[i].events &= ~POLLOUT; // Снимаем POLLOUT, если буфер пуст
                 } else {
                     ssize_t bytesSent = send(clientSocket, clientIt->second.getOutputBuffer().c_str(), clientIt->second.getOutputBuffer().length(), 0);
                     std::cout << "Bytes sent: " << bytesSent << std::endl;
-            
+                    
                     if (bytesSent < 0) { // Ошибка отправки
                         if (errno == EAGAIN || errno == EWOULDBLOCK) {
                             std::cout << "Temporary write block for client " << clientSocket << ", will retry later.\n";
