@@ -359,6 +359,7 @@ void Server::removeClient(int clientSocket, std::vector<pollfd>& fds) {
 
 void Server::shutdown() {
     for (std::map<int, Client>::iterator it = m_clients.begin(); it != m_clients.end(); ++it) {
+        // SOOBSHENIE POSLAT
         close(it->first);
     }
     m_clients.clear();
