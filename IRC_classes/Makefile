@@ -51,7 +51,7 @@ all: $(NAME)
 	@printf $(YELLOW)"/quote NICK Bob\n"
 	@printf $(YELLOW)"/quote USER bob 0 * :bob\n"
 	@printf $(YELLOW)"/join #test\n"
-	@printf $(YELLOW)"/window close\n"
+	@printf $(YELLOW)"/window close (1, 2 ...)\n"
 	@printf $(YELLOW)"/msg Alice Привет, это личное!\n"
 
 $(NAME): $(OBJS)
