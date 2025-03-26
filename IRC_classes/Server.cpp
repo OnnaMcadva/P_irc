@@ -89,9 +89,9 @@ void Server::run() {
                             std::cout << "Temporary write block for client " << fds[i].fd << ", will retry later.\n";
                         } else {
                             std::cerr << "Error writing to client " << fds[i].fd << ": " << strerror(errno) << "\n";
-                            toRemove.push_back(i); // Помечаем для удаления при серьёзной ошибке
+                            toRemove.push_back(i); /* Mark for deletion on a critical error */
                         }
-                    } else { // bytesWritten == 0
+                    } else { /* bytesWritten == 0 */
                         std::cout << "Client " << fds[i].fd << " closed connection.\n";
                         toRemove.push_back(i); // Клиент закрыл соединение
                     }
@@ -356,7 +356,6 @@ void Server::removeClient(int clientSocket, std::vector<pollfd>& fds) {
 
 void Server::shutdown() {
     for (std::map<int, Client>::iterator it = m_clients.begin(); it != m_clients.end(); ++it) {
-        // SOOBSHENIE POSLAT
         close(it->first);
     }
     m_clients.clear();
