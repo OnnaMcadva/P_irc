@@ -265,6 +265,7 @@ void Server::handleNewConnection(std::vector<pollfd>& fds) {
                 std::cout << "Current buffer: " << inputBuffer << std::endl;
 
                 size_t pos;
+                /* логика для накопления - надо изменить!!!!*/
                 while ((pos = inputBuffer.find("\r\n")) != std::string::npos || (pos = inputBuffer.find("\n")) != std::string::npos) {
                     std::string command = inputBuffer.substr(0, pos);
                     size_t len_to_erase = (inputBuffer[pos] == '\r') ? pos + 2 : pos + 1;
