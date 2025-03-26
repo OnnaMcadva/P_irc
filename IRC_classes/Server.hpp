@@ -33,7 +33,7 @@ private:
     void removeClientFromChannels(int clientSocket);
     void removeClient(int clientSocket, std::vector<pollfd>& fds);
     void shutdown();
-
+    
     friend class CommandHandler;
 };
 

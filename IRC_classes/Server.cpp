@@ -50,7 +50,7 @@ void Server::run() {
     fds.push_back(serverFd); /* первый сокет добавлен. это собственно сам сервер */
 
     while (!shouldStop) {
-        int ret = poll(fds.data(), fds.size(), 100);
+        int ret = poll(fds.data(), fds.size(), 50);
         if (ret < 0) {
             if (errno == EINTR) continue;
             std::cerr << "Error: poll failed with errno " << errno << "\n";
@@ -85,11 +85,9 @@ void Server::run() {
                         client.eraseOutputBuffer(bytesWritten);
                         std::cout << "Bytes sent: " << bytesWritten << "\n";
                     } else if (bytesWritten < 0) {
-                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                            std::cout << "Temporary write block for client " << fds[i].fd << ", will retry later.\n";
-                        } else {
+                        if (bytesWritten < 0) {
                             std::cerr << "Error writing to client " << fds[i].fd << ": " << strerror(errno) << "\n";
-                            toRemove.push_back(i); /* Mark for deletion on a critical error */
+                            toRemove.push_back(i); // Удаляем клиента при любой ошибке
                         }
                     } else { /* bytesWritten == 0 */
                         std::cout << "Client " << fds[i].fd << " closed connection.\n";
@@ -302,14 +300,9 @@ void Server::handleNewConnection(std::vector<pollfd>& fds) {
                     std::cout << "Bytes sent: " << bytesSent << std::endl;
                     
                     if (bytesSent < 0) { // Ошибка отправки
-                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                            std::cout << "Temporary write block for client " << clientSocket << ", will retry later.\n";
-                            return; // Не удаляем клиента, ждем следующего POLLOUT
-                        } else {
                             std::cout << "Failed to send data to client " << clientSocket << ": errno " << errno << "\n";
                             removeClient(clientSocket, fds);
                             return;
-                        }
                     } else if (bytesSent == 0) { // Клиент закрыл соединение
                         std::cout << "Client " << clientSocket << " closed connection.\n";
                         removeClient(clientSocket, fds);
