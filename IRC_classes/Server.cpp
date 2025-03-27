@@ -362,5 +362,5 @@ void Server::shutdown() {
     channels.clear();
 
     std::cout << " \033[38;5;222mServer shutdown complete.\033[0m\n";
-    std::cout << "                               🚀\n";
+    std::cout << "                               🧨\n";
 }
