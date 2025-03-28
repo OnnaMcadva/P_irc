@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <sstream>
 #include <cstdlib>
+#include <unistd.h>
 
 CommandHandler::CommandHandler(Server& s) : server(s) {}
 
@@ -84,29 +85,25 @@ void CommandHandler::handlePassword(int clientSocket, const std::string& input, 
 }
 
 /* This piece of code must remain untouched under any circumstances. */
-
-void CommandHandler::handleQuit(int clientSocket, Client& client, std::vector<pollfd>& fds, size_t i) {
+void CommandHandler::handleQuit(int clientSocket, Client& client, std::vector<pollfd>& fds) {
     std::cout << "Client requested to quit.\n";
 
-    // Уведомляем всех остальных
+    // Уведомляем всех остальных клиентов
     std::string quitMessage = ":" + client.getNickname() + " QUIT :Quit\r\n";
     for (std::map<int, Client>::iterator it = server.m_clients.begin(); it != server.m_clients.end(); ++it) {
-        if (it->first != clientSocket) {
+        if (it->first != clientSocket) { // Не отправляем уходящему клиенту
             it->second.appendOutputBuffer(quitMessage);
             for (size_t j = 0; j < fds.size(); ++j) {
                 if (fds[j].fd == it->first) {
-                    fds[j].events |= POLLOUT;
+                    fds[j].events |= POLLOUT; // Устанавливаем POLLOUT для отправки
                     break;
                 }
             }
         }
     }
 
-    // Прощальное сообщение клиенту
-    std::string goodbyeMessage = ":server 221 " + client.getNickname() + " :Goodbye\r\n";
-    client.appendOutputBuffer(goodbyeMessage);
-    fds[i].events |= POLLOUT;
-    server.removeClient(clientSocket, fds); // Удаляем сразу
+    // Сразу разрываем связь с клиентом
+    server.removeClient(clientSocket, fds); // Удаляем из m_clients и fds
 }
 /* End of message */
 
@@ -157,7 +154,7 @@ void CommandHandler::handleNick(int clientSocket, const std::string& input, Clie
             std::string response = ":server 001 " + nickname + " :Good NickName ✨\r\n";
             client.appendOutputBuffer(response);
             if (!oldNick.empty()) {
-                std::string response = ":" + oldNick + "'s [aka " + client.getUsername() + "] new NICK is " + nickname + "\r\n";
+                std::string response = ":" + oldNick + "'s "/*[aka  + client.getUsername() + ] */"new NICK is " + nickname + "\r\n";
                 client.appendOutputBuffer(response);
             }
             fds[i].events |= POLLOUT;
@@ -287,7 +284,7 @@ void CommandHandler::handleJoin(int clientSocket, const std::string& input, Clie
             server.channels.push_back(newChannel);
         }
         std::cout << "Client joined channel: " << channelName << "\n";
-        std::string response = ":" + client.getNickname() + " [aka " + client.getUsername() + "] JOIN " + channelName + "\r\n";
+        std::string response = ":" + client.getNickname() + /* [aka  + client.getUsername() + ]*/" JOIN " + channelName + "\r\n";
         client.appendOutputBuffer(response);
         fds[i].events |= POLLOUT;
         broadcastMessage(clientSocket, "JOIN " + channelName, fds);
@@ -438,7 +435,7 @@ void CommandHandler::handleInvite(int clientSocket, const std::string& input, Cl
             it->invite(targetSocket);
             std::map<int, Client>::iterator targetIt = server.m_clients.find(targetSocket);
             if (targetIt != server.m_clients.end()) {
-                std::string response = ":" + client.getNickname() + " [aka " + client.getUsername() + "] INVITE " + targetNick + " :" + channelName + "\r\n";
+                std::string response = ":" + client.getNickname() + /*[aka  + client.getUsername() + ]*/" INVITE " + targetNick + " :" + channelName + "\r\n";
                 targetIt->second.appendOutputBuffer(response);
                 client.appendOutputBuffer(":server 341 " + client.getNickname() + " " + targetNick + " " + channelName + "\r\n");
                 fds[i].events |= POLLOUT;
@@ -621,7 +618,7 @@ void CommandHandler::processCommand(int clientSocket, const std::string& input, 
             return;
         }
         if (strncmp(input.c_str(), "QUIT", 4) == 0) {
-            handleQuit(clientSocket, *client, fds, i);
+            handleQuit(clientSocket, *client, fds);
         } else if (input.rfind("NICK", 0) == 0) {
             handleNick(clientSocket, input, *client, fds, i);
         } else if (input.rfind("USER", 0) == 0) {
@@ -672,7 +669,7 @@ void CommandHandler::broadcastMessage(int senderSocket, const std::string& messa
                             std::map<int, Client>::iterator memberClientIt = server.m_clients.find(memberIt->first);
                             if (memberClientIt != server.m_clients.end()) {
                                 /* We use a quasi-standard IRC format */
-                                std::string response = ":" + senderNick + " [aka " + senderUser + "] PRIVMSG " + target + " :" + text + "\r\n";
+                                std::string response = ":" + senderNick + /*[aka  + senderUser + ] */" PRIVMSG " + target + " :" + text + "\r\n";
                                 memberClientIt->second.appendOutputBuffer(response);
                                 for (size_t j = 0; j < fds.size(); ++j) {
                                     if (fds[j].fd == memberIt->first) {
@@ -698,7 +695,7 @@ void CommandHandler::broadcastMessage(int senderSocket, const std::string& messa
             // Личное сообщение
             for (std::map<int, Client>::iterator it = server.m_clients.begin(); it != server.m_clients.end(); ++it) {
                 if (it->second.getNickname() == target && it->first != senderSocket) {
-                    std::string response = ":" + senderNick + " [aka " + senderUser + "] PRIVMSG " + target + " :" + text + "\r\n";
+                    std::string response = ":" + senderNick + /*[aka  + senderUser + ] */ "PRIVMSG " + target + " :" + text + "\r\n";
                     it->second.appendOutputBuffer(response);
                     for (size_t j = 0; j < fds.size(); ++j) {
                         if (fds[j].fd == it->first) {
@@ -727,14 +724,29 @@ void CommandHandler::broadcastMessage(int senderSocket, const std::string& messa
                         std::map<int, Client>::iterator memberClientIt = server.m_clients.find(memberIt->first);
                         if (memberClientIt != server.m_clients.end()) {
                             std::string response;
-                            if (command == "JOIN")
-                                response = ":" + senderNick + " [aka " + senderUser + "] JOIN " + target + "\r\n";
+                            if (command == "JOIN") {
+                                response = ":" + senderNick + " JOIN " + target + "\r\n";
+                                memberClientIt->second.appendOutputBuffer(response);
+                                // Список пользователей в канале
+                                std::string names = ":localhost 353 " + senderNick + " = " + target + " :";
+                                for (std::map<int, bool>::iterator m = members.begin(); m != members.end(); ++m) {
+                                    std::map<int, Client>::iterator c = server.m_clients.find(m->first);
+                                    if (c != server.m_clients.end()) names += c->second.getNickname() + " ";
+                                }
+                                names += "\r\n";
+                                memberClientIt->second.appendOutputBuffer(names);
+                                // Конец списка
+                                std::string end = ":localhost 366 " + senderNick + " " + target + " :End of /NAMES list\r\n";
+                                memberClientIt->second.appendOutputBuffer(end);
+                            }
+                            // if (command == "JOIN")
+                            //     response = ":" + senderNick + "/* [aka " + senderUser + "]*/ JOIN " + target + "\r\n";
                             else if (command == "KICK")
-                                response = ":" + senderNick + " [aka " + senderUser + "] KICK " + target + " " + message.substr(secondSpace + 1) + "\r\n";
+                                response = ":" + senderNick + /* [aka  + senderUser + ]*/" KICK " + target + " " + message.substr(secondSpace + 1) + "\r\n";
                             else if (command == "TOPIC")
-                                response = ":" + senderNick + " [aka " + senderUser + "] TOPIC " + target + " :" + text + "\r\n";
+                                response = ":" + senderNick + /* [aka  + senderUser + ]*/" TOPIC " + target + " :" + text + "\r\n";
                             else
-                                response = ":" + senderNick + " [aka " + senderUser + "] MODE " + target + " " + message.substr(firstSpace + 1) + "\r\n";
+                                response = ":" + senderNick + /* [aka  + senderUser + ]*/" MODE " + target + " " + message.substr(firstSpace + 1) + "\r\n";
                             memberClientIt->second.appendOutputBuffer(response);
                             for (size_t j = 0; j < fds.size(); ++j) {
                                 if (fds[j].fd == memberIt->first) {

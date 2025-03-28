@@ -60,64 +60,51 @@ void Server::run() {
             continue;
         }
 
-        std::vector<size_t> toRemove; // Индексы сокетов для удаления
         for (size_t i = 0; i < fds.size(); ++i) {
             if (fds[i].revents & POLLIN) {
                 if (fds[i].fd == m_serverSocket) {
                     handleNewConnection(fds);
                 } else {
-                    handleClientData(fds[i].fd, fds);
+                    handleClientData(fds[i].fd, fds); // Обрабатываем команды, включая QUIT
                 }
             }
             if (fds[i].revents & POLLOUT && fds[i].fd != m_serverSocket) {
-                std::map<int, Client>::iterator clientIt = m_clients.find(fds[i].fd);
-                if (clientIt == m_clients.end()) {
-                    std::cout << "Client " << fds[i].fd << " not found in m_clients.\n";
-                    toRemove.push_back(i);
+                if (m_clients.find(fds[i].fd) == m_clients.end()) { // Клиент уже удалён
+                    close(fds[i].fd);
+                    fds.erase(fds.begin() + i);
+                    --i;
                     continue;
                 }
-
-                Client& client = clientIt->second;
+                Client& client = m_clients[fds[i].fd];
                 std::string buffer = client.getOutputBuffer();
                 if (!buffer.empty()) {
                     ssize_t bytesWritten = send(fds[i].fd, buffer.c_str(), buffer.size(), 0);
                     if (bytesWritten > 0) {
                         client.eraseOutputBuffer(bytesWritten);
                         std::cout << "Bytes sent: " << bytesWritten << "\n";
-                    } else if (bytesWritten < 0) {
-                        if (bytesWritten < 0) {
-                            std::cerr << "Error writing to client " << fds[i].fd << ": " << strerror(errno) << "\n";
-                            toRemove.push_back(i); // Удаляем клиента при любой ошибке
-                        }
-                    } else { /* bytesWritten == 0 */
-                        std::cout << "Client " << fds[i].fd << " closed connection.\n";
-                        toRemove.push_back(i); // Клиент закрыл соединение
+                    } else if (bytesWritten <= 0) {
+                        std::cout << "Client " << fds[i].fd << " disconnected during send.\n";
+                        removeClient(fds[i].fd, fds); // Удаляем клиента только при реальной ошибке
+                        --i; // Уменьшаем индекс, так как удалили элемент
+                        continue; // Пропускаем дальнейшую обработку
                     }
                 }
+                // Снимаем POLLOUT только если буфер пуст
                 if (client.getOutputBuffer().empty()) {
-                    fds[i].events = POLLIN; // Снимаем POLLOUT, если буфер пуст
+                    fds[i].events = POLLIN;
                 }
             }
-            // Если клиент удалён из m_clients, помечаем сокет для удаления
-            if (fds[i].fd != m_serverSocket && m_clients.find(fds[i].fd) == m_clients.end()) {
-                toRemove.push_back(i);
-            }
-        }
-
-        // Удаляем "мёртвые" сокеты
-        for (std::vector<size_t>::reverse_iterator it = toRemove.rbegin(); it != toRemove.rend(); ++it) {
-            std::cout << "Closing socket " << fds[*it].fd << "\n"; // Для отладки
-            close(fds[*it].fd); // Закрываем сокет
-            fds.erase(fds.begin() + *it); // Удаляем из fds
         }
 
         // Обновляем events для оставшихся клиентов
         for (size_t i = 1; i < fds.size(); ++i) {
-            Client& client = m_clients[fds[i].fd];
-            if (!client.getOutputBuffer().empty()) {
-                fds[i].events = POLLIN | POLLOUT;
-            } else {
-                fds[i].events = POLLIN;
+            if (m_clients.find(fds[i].fd) != m_clients.end()) {
+                Client& client = m_clients[fds[i].fd];
+                if (!client.getOutputBuffer().empty()) {
+                    fds[i].events = POLLIN | POLLOUT;
+                } else {
+                    fds[i].events = POLLIN;
+                }
             }
         }
     }
@@ -297,17 +284,16 @@ void Server::handleNewConnection(std::vector<pollfd>& fds) {
                     fds[i].events &= ~POLLOUT; // Снимаем POLLOUT, если буфер пуст
                 } else {
                     ssize_t bytesSent = send(clientSocket, clientIt->second.getOutputBuffer().c_str(), clientIt->second.getOutputBuffer().length(), 0);
-                    std::cout << "Bytes sent: " << bytesSent << std::endl;
-                    
                     if (bytesSent < 0) { // Ошибка отправки
-                            std::cout << "Failed to send data to client " << clientSocket << ": errno " << errno << "\n";
-                            removeClient(clientSocket, fds);
-                            return;
+                        std::cout << "Failed to send data to client " << clientSocket << ": errno " << errno << "\n";
+                        removeClient(clientSocket, fds);
+                        return;
                     } else if (bytesSent == 0) { // Клиент закрыл соединение
                         std::cout << "Client " << clientSocket << " closed connection.\n";
                         removeClient(clientSocket, fds);
                         return;
                     } else { // Успешная отправка
+                        std::cout << "Bytes sent: " << bytesSent << std::endl;
                         if (static_cast<size_t>(bytesSent) < clientIt->second.getOutputBuffer().length()) {
                             std::cout << "Partial send: " << bytesSent << " of " << clientIt->second.getOutputBuffer().length() << " bytes sent.\n";
                         }

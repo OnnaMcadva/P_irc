@@ -46,6 +46,7 @@ all: $(NAME)
 	@printf $(BOLD)$(YELLOW)"USER Wonderland :\n"
 	@printf $(BOLD)$(CYAN)"irssi\n"
 	@printf $(YELLOW)"/set autolog off\n"
+	@printf $(YELLOW)"/layout reset (save)\n"
 	@printf $(YELLOW)"/connect localhost 6667\n"
 	@printf $(YELLOW)"/quote PASS :jopa\n"
 	@printf $(YELLOW)"/quote NICK Bob\n"
