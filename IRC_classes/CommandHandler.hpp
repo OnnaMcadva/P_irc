@@ -20,12 +20,14 @@ private:
     void handlePassword(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i);
     void handleQuit(int clientSocket, Client& client, std::vector<pollfd>& fds);
     void handleNick(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i);
-    void handleUser(const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i);
+    void handleUser(const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i); // убрал clientSocket
     void handleJoin(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i);
     void handlePrivmsg(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i);
+    void handleWhois(const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i);
+    void handleMode(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i);
+    void handlePing(const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i);
     void handleKick(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i);
     void handleInvite(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i);
     void handleTopic(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i);
-    void handleMode(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i);
     void handleUnknownCommand(const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i);
 };

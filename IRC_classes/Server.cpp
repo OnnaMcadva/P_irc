@@ -200,6 +200,9 @@ void Server::handleNewConnection(std::vector<pollfd>& fds) {
     }
 
     m_clients.insert(std::make_pair(clientSocket, Client(clientSocket)));
+    // Client newClient(clientSocket);
+    // newClient.appendOutputBuffer("Enter password: ");
+    // m_clients.insert(std::pair<int, Client>(clientSocket, newClient));
 
     pollfd clientFd;
     clientFd.fd = clientSocket;
@@ -250,7 +253,6 @@ void Server::handleNewConnection(std::vector<pollfd>& fds) {
                 std::cout << "Current buffer: " << inputBuffer << std::endl;
 
                 size_t pos;
-                /* логика для накопления - надо изменить!!!!*/
                 while ((pos = inputBuffer.find("\r\n")) != std::string::npos || (pos = inputBuffer.find("\n")) != std::string::npos) {
                     std::string command = inputBuffer.substr(0, pos);
                     size_t len_to_erase = (inputBuffer[pos] == '\r') ? pos + 2 : pos + 1;
@@ -273,27 +275,34 @@ void Server::handleNewConnection(std::vector<pollfd>& fds) {
             if (fds[i].revents & POLLOUT) {
                 std::cout << "POLLOUT triggered for client " << clientSocket << ", buffer size: " << m_clients[clientSocket].getOutputBuffer().length() << std::endl;
                 
+                // Проверяем, существует ли клиент
                 std::map<int, Client>::iterator clientIt = m_clients.find(clientSocket);
                 if (clientIt == m_clients.end()) {
                     std::cout << "Client " << clientSocket << " not found in m_clients.\n";
                     removeClient(clientSocket, fds);
                     return;
                 }
-                
+            
                 if (clientIt->second.getOutputBuffer().empty()) {
                     fds[i].events &= ~POLLOUT; // Снимаем POLLOUT, если буфер пуст
                 } else {
                     ssize_t bytesSent = send(clientSocket, clientIt->second.getOutputBuffer().c_str(), clientIt->second.getOutputBuffer().length(), 0);
+                    std::cout << "Bytes sent: " << bytesSent << std::endl;
+            
                     if (bytesSent < 0) { // Ошибка отправки
-                        std::cout << "Failed to send data to client " << clientSocket << ": errno " << errno << "\n";
-                        removeClient(clientSocket, fds);
-                        return;
+                        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                            std::cout << "Temporary write block for client " << clientSocket << ", will retry later.\n";
+                            return; // Не удаляем клиента, ждем следующего POLLOUT
+                        } else {
+                            std::cout << "Failed to send data to client " << clientSocket << ": errno " << errno << "\n";
+                            removeClient(clientSocket, fds);
+                            return;
+                        }
                     } else if (bytesSent == 0) { // Клиент закрыл соединение
                         std::cout << "Client " << clientSocket << " closed connection.\n";
                         removeClient(clientSocket, fds);
                         return;
                     } else { // Успешная отправка
-                        std::cout << "Bytes sent: " << bytesSent << std::endl;
                         if (static_cast<size_t>(bytesSent) < clientIt->second.getOutputBuffer().length()) {
                             std::cout << "Partial send: " << bytesSent << " of " << clientIt->second.getOutputBuffer().length() << " bytes sent.\n";
                         }
