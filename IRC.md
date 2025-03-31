@@ -1,3 +1,6 @@
+![Screenshot from 2025-04-01 00-48-20](https://github.com/user-attachments/assets/620c05fa-6eeb-40e6-8a8d-949a19a20747)
+
+
 
 ### **Команды клиента:**
 0. `PASS :<password>` - пароль сервера.
