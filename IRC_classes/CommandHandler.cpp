@@ -86,18 +86,18 @@ void CommandHandler::handlePassword(int clientSocket, const std::string& input, 
 void CommandHandler::handleQuit(int clientSocket, Client& client, std::vector<pollfd>& fds) {
     std::cout << "Client requested to quit.\n";
 
-    std::string quitMessage = ":" + client.getNickname() + " QUIT :Quit\r\n";
-    for (std::map<int, Client>::iterator it = server.m_clients.begin(); it != server.m_clients.end(); ++it) {
-        if (it->first != clientSocket) {
-            it->second.appendOutputBuffer(quitMessage);
-            for (size_t j = 0; j < fds.size(); ++j) {
-                if (fds[j].fd == it->first) {
-                    fds[j].events |= POLLOUT;
-                    break;
-                }
-            }
-        }
-    }
+    // std::string quitMessage = ":" + client.getNickname() + " QUIT :Quit\r\n";
+    // for (std::map<int, Client>::iterator it = server.m_clients.begin(); it != server.m_clients.end(); ++it) {
+    //     if (it->first != clientSocket) {
+    //         it->second.appendOutputBuffer(quitMessage);
+    //         for (size_t j = 0; j < fds.size(); ++j) {
+    //             if (fds[j].fd == it->first) {
+    //                 fds[j].events |= POLLOUT;
+    //                 break;
+    //             }
+    //         }
+    //     }
+    // }
     server.removeClient(clientSocket, fds);
 }
 /* End of message */
@@ -313,6 +313,26 @@ void CommandHandler::handlePrivmsg(int clientSocket, const std::string& input, C
         }
         std::string message = input.substr(colonPos + 1);
         std::cout << "Received private message to " << target << ": " << message << "\n";
+
+        // Проверка для каналов
+        if (target[0] == '#') {
+            bool isMember = false;
+            for (std::vector<Channel>::iterator it = server.channels.begin(); it != server.channels.end(); ++it) {
+                if (it->getName() == target) {
+                    if (it->getMembers().find(clientSocket) != it->getMembers().end()) {
+                        isMember = true;
+                    }
+                    break;
+                }
+            }
+            if (!isMember) {
+                std::string response = ":server 404 " + client.getNickname() + " " + target + " :Cannot send to channel\r\n";
+                client.appendOutputBuffer(response);
+                fds[i].events |= POLLOUT;
+                return;
+            }
+        }
+
         broadcastMessage(clientSocket, "PRIVMSG " + target + " :" + message, fds);
         std::string response = ":server 001 " + client.getNickname() + " :Message sent\r\n";
         client.appendOutputBuffer(response);
@@ -481,12 +501,40 @@ void CommandHandler::handleKick(int clientSocket, const std::string& input, Clie
         fds[i].events |= POLLOUT;
         return;
     }
-    std::string channelName = params.substr(0, spacePos);
+    std::string firstParam = params.substr(0, spacePos);
     std::string rest = params.substr(spacePos + 1);
-    size_t nextSpace = rest.find(' ');
-    std::string targetNick = nextSpace == std::string::npos ? rest : rest.substr(0, nextSpace);
-    std::string reason = nextSpace != std::string::npos && rest.find(':') != std::string::npos ? rest.substr(rest.find(':') + 1) : "Kicked by operator";
+    std::string channelName, targetNick;
+    size_t colonPos = rest.find(':');
+    std::string reason;
+
+    if (firstParam[0] == '#') {
+        channelName = firstParam;
+        if (colonPos != std::string::npos) {
+            targetNick = rest.substr(0, colonPos);
+            reason = (colonPos + 1 < rest.length()) ? rest.substr(colonPos + 1) : "Kicked by operator";
+        } else {
+            targetNick = rest;
+            reason = "Kicked by operator";
+        }
+    } else {
+        targetNick = firstParam;
+        size_t secondSpace = rest.find(' ');
+        if (secondSpace == std::string::npos && colonPos == std::string::npos) {
+            channelName = rest;
+            reason = "Kicked by operator";
+        } else {
+            if (colonPos != std::string::npos) {
+                channelName = rest.substr(0, colonPos);
+                reason = (colonPos + 1 < rest.length()) ? rest.substr(colonPos + 1) : "Kicked by operator";
+            } else {
+                channelName = rest.substr(0, secondSpace);
+                reason = rest.substr(secondSpace + 1);
+            }
+        }
+    }
+
     while (!targetNick.empty() && targetNick[0] == ' ') targetNick.erase(0, 1);
+    while (!targetNick.empty() && targetNick[targetNick.length() - 1] == ' ') targetNick.erase(targetNick.length() - 1, 1);
     while (!channelName.empty() && (channelName[0] == ' ' || channelName[channelName.length() - 1] == ' '))
         channelName.erase(channelName[0] == ' ' ? 0 : channelName.length() - 1, 1);
 
@@ -512,6 +560,15 @@ void CommandHandler::handleKick(int clientSocket, const std::string& input, Clie
                 return;
             }
             it->removeMember(targetSocket);
+            std::string response = ":" + client.getNickname() + "!" + client.getUsername() + "@localhost KICK " + channelName + " " + targetNick + " :" + reason + "\r\n";
+            std::cout << "Sending KICK to kicked client: " << targetSocket << std::endl;
+            server.m_clients[targetSocket].appendOutputBuffer(response);
+            for (size_t j = 0; j < fds.size(); ++j) {
+                if (fds[j].fd == targetSocket) {
+                    fds[j].events |= POLLOUT;
+                    break;
+                }
+            }
             broadcastMessage(clientSocket, "KICK " + channelName + " " + targetNick + " :" + reason, fds);
             fds[i].events |= POLLOUT;
             return;
@@ -698,21 +755,37 @@ void CommandHandler::broadcastMessage(int senderSocket, const std::string& messa
                 size_t colonPos = message.find(':');
                 if (colonPos == std::string::npos) return;
                 text = message.substr(colonPos + 1); 
+            } else if (command == "KICK") {
+                if (secondSpace == std::string::npos) return;
+                size_t thirdSpace = message.find(' ', secondSpace + 1);
+                if (thirdSpace == std::string::npos) return;
+                target = message.substr(commandStart + 1, secondSpace - commandStart - 1);
+                kickedNick = message.substr(secondSpace + 1, thirdSpace - secondSpace - 1);
+                size_t colonPos = message.find(':');
+                text = (colonPos != std::string::npos && colonPos + 1 < message.length() && message.substr(colonPos + 1).find_first_not_of(" \r\n") != std::string::npos) ? message.substr(colonPos + 1) : "Kicked by operator";
             }
         } else {
             return;
         }
     } else {
-        /* Старый парсинг для случаев без префикса */
         if (firstSpace == std::string::npos) return;
         command = message.substr(0, firstSpace);
         size_t secondSpace = message.find(' ', firstSpace + 1);
-        if (secondSpace == std::string::npos && command != "JOIN" && command != "MODE") return;
-        target = (command == "JOIN" || command == "MODE") ? message.substr(firstSpace + 1) : message.substr(firstSpace + 1, secondSpace - firstSpace - 1);
-        if (command == "PRIVMSG") {
+        if (secondSpace == std::string::npos && command != "JOIN" && command != "MODE" && command != "KICK") return;
+        if (command == "JOIN" || command == "MODE") {
+            target = message.substr(firstSpace + 1);
+        } else if (command == "PRIVMSG") {
+            target = message.substr(firstSpace + 1, secondSpace - firstSpace - 1);
             size_t colonPos = message.find(':');
             if (colonPos == std::string::npos) return;
             text = message.substr(colonPos + 1);
+        } else if (command == "KICK") {
+            size_t thirdSpace = message.find(' ', secondSpace + 1);
+            if (thirdSpace == std::string::npos) return;
+            target = message.substr(firstSpace + 1, secondSpace - firstSpace - 1);
+            kickedNick = message.substr(secondSpace + 1, thirdSpace - secondSpace - 1);
+            size_t colonPos = message.find(':');
+            text = (colonPos != std::string::npos && colonPos + 1 < message.length() && message.substr(colonPos + 1).find_first_not_of(" \r\n") != std::string::npos) ? message.substr(colonPos + 1) : "Kicked by operator";
         }
     }
 
@@ -755,7 +828,7 @@ void CommandHandler::broadcastMessage(int senderSocket, const std::string& messa
             }
         }
     } else if (command == "JOIN") {
-        std::cout << "Broadcasting JOIN for channel: " << target << std::endl; /* Отладка */
+        std::cout << "Broadcasting JOIN for channel: " << target << std::endl;
         for (std::vector<Channel>::iterator it = server.channels.begin(); it != server.channels.end(); ++it) {
             if (it->getName() == target) {
                 std::map<int, bool> members = it->getMembers();
@@ -797,12 +870,13 @@ void CommandHandler::broadcastMessage(int senderSocket, const std::string& messa
                 break;
             }
         }
-    } else if (command == "KICK") { 
+    } else if (command == "KICK") {
         for (std::vector<Channel>::iterator it = server.channels.begin(); it != server.channels.end(); ++it) {
             if (it->getName() == target) {
                 std::map<int, bool> members = it->getMembers();
                 std::string response = ":" + senderNick + "!" + senderUser + "@localhost KICK " + target + " " + kickedNick + " :" + text + "\r\n";
                 for (std::map<int, bool>::iterator memberIt = members.begin(); memberIt != members.end(); ++memberIt) {
+                    std::cout << "Sending KICK to member: " << memberIt->first << std::endl;
                     server.m_clients[memberIt->first].appendOutputBuffer(response);
                     for (size_t i = 0; i < fds.size(); ++i) {
                         if (fds[i].fd == memberIt->first) {
@@ -811,19 +885,7 @@ void CommandHandler::broadcastMessage(int senderSocket, const std::string& messa
                         }
                     }
                 }
-                for (std::map<int, Client>::iterator clientIt = server.m_clients.begin(); clientIt != server.m_clients.end(); ++clientIt) {
-                    if (clientIt->second.getNickname() == kickedNick) {
-                        server.m_clients[clientIt->first].appendOutputBuffer(response);
-                        for (size_t i = 0; i < fds.size(); ++i) {
-                            if (fds[i].fd == clientIt->first) {
-                                fds[i].events |= POLLOUT;
-                                break;
-                            }
-                        }
-                        break;
-                    }
-                }
-                break;
+                break; 
             }
         }
     }
