@@ -15,8 +15,8 @@ std::string Client::getNickname() const { return nickname; }
 void Client::setNickname(const std::string& nick) { nickname = nick; }
 std::string Client::getUsername() const { return username; }
 void Client::setUsername(const std::string& user) { username = user; }
-std::string Client::getRealname() const { return realname; } // Реализация геттера
-void Client::setRealname(const std::string& name) { realname = name; } // Реализация сеттера
+std::string Client::getRealname() const { return realname; }
+void Client::setRealname(const std::string& name) { realname = name; }
 std::string Client::getInputBuffer() const { return inputBuffer; }
 void Client::appendInputBuffer(const std::string& data) { inputBuffer += data; }
 void Client::clearInputBuffer() { inputBuffer = ""; }

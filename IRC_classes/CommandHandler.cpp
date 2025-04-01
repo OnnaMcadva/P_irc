@@ -41,7 +41,8 @@ It verifies the password provided in the command and takes appropriate actions:
 void CommandHandler::handlePassword(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i) {
     // Проверяем, начинается ли строка с "PASS :"
     if (input.rfind("PASS :", 0) != 0) {
-        // Если это не команда PASS, просто выходим и ждём следующую команду
+        /* Если это не команда PASS, просто выходим и ждём следующую команду
+        Ну короче здесь есть сомнения */
         return;
     }
 
@@ -410,7 +411,7 @@ void CommandHandler::handleMode(int clientSocket, const std::string& input, Clie
             std::string arg = modeStr.length() > 2 ? modeStr.substr(3) : "";
             while (!arg.empty() && arg[0] == ' ') arg.erase(0, 1);
 
-            int targetSocket = -1; // Перенесено за межі switch
+            int targetSocket = -1;
             switch (mode) {
                 case 'i':
                     it->setInviteOnly(addMode);
@@ -492,12 +493,15 @@ void CommandHandler::handlePing(const std::string& input, Client& client, std::v
 }
 
 void CommandHandler::handleKick(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i) {
+    // Проверка на слишком короткую команду
     if (input.length() <= 5) {
         std::string response = ":server 461 " + client.getNickname() + " KICK :Not enough parameters\r\n";
         client.appendOutputBuffer(response);
         fds[i].events |= POLLOUT;
         return;
     }
+
+    // Разделяем параметры
     std::string params = input.substr(5);
     size_t spacePos = params.find(' ');
     if (spacePos == std::string::npos) {
@@ -506,14 +510,15 @@ void CommandHandler::handleKick(int clientSocket, const std::string& input, Clie
         fds[i].events |= POLLOUT;
         return;
     }
+
     std::string firstParam = params.substr(0, spacePos);
     std::string rest = params.substr(spacePos + 1);
-    std::string channelName, targetNick;
-    size_t colonPos = rest.find(':');
-    std::string reason;
+    std::string channelName, targetNick, reason;
 
+    // Парсим канал и ник
     if (firstParam[0] == '#') {
         channelName = firstParam;
+        size_t colonPos = rest.find(':');
         if (colonPos != std::string::npos) {
             targetNick = rest.substr(0, colonPos);
             reason = (colonPos + 1 < rest.length()) ? rest.substr(colonPos + 1) : "Kicked by operator";
@@ -523,14 +528,15 @@ void CommandHandler::handleKick(int clientSocket, const std::string& input, Clie
         }
     } else {
         targetNick = firstParam;
-        size_t secondSpace = rest.find(' ');
-        if (secondSpace == std::string::npos && colonPos == std::string::npos) {
-            channelName = rest;
-            reason = "Kicked by operator";
+        size_t colonPos = rest.find(':');
+        if (colonPos != std::string::npos) {
+            channelName = rest.substr(0, colonPos);
+            reason = (colonPos + 1 < rest.length()) ? rest.substr(colonPos + 1) : "Kicked by operator";
         } else {
-            if (colonPos != std::string::npos) {
-                channelName = rest.substr(0, colonPos);
-                reason = (colonPos + 1 < rest.length()) ? rest.substr(colonPos + 1) : "Kicked by operator";
+            size_t secondSpace = rest.find(' ');
+            if (secondSpace == std::string::npos) {
+                channelName = rest;
+                reason = "Kicked by operator";
             } else {
                 channelName = rest.substr(0, secondSpace);
                 reason = rest.substr(secondSpace + 1);
@@ -538,19 +544,24 @@ void CommandHandler::handleKick(int clientSocket, const std::string& input, Clie
         }
     }
 
+    // Убираем лишние пробелы
     while (!targetNick.empty() && targetNick[0] == ' ') targetNick.erase(0, 1);
     while (!targetNick.empty() && targetNick[targetNick.length() - 1] == ' ') targetNick.erase(targetNick.length() - 1, 1);
     while (!channelName.empty() && (channelName[0] == ' ' || channelName[channelName.length() - 1] == ' '))
         channelName.erase(channelName[0] == ' ' ? 0 : channelName.length() - 1, 1);
 
+    // Ищем канал
     for (std::vector<Channel>::iterator it = server.channels.begin(); it != server.channels.end(); ++it) {
         if (it->getName() == channelName) {
+            // Проверяем, оператор ли отправитель
             if (!it->isOperator(clientSocket)) {
                 std::string response = ":server 482 " + client.getNickname() + " " + channelName + " :You're not channel operator\r\n";
                 client.appendOutputBuffer(response);
                 fds[i].events |= POLLOUT;
                 return;
             }
+
+            // Ищем сокет цели по нику
             int targetSocket = -1;
             for (std::map<int, Client>::iterator clientIt = server.m_clients.begin(); clientIt != server.m_clients.end(); ++clientIt) {
                 if (clientIt->second.getNickname() == targetNick) {
@@ -558,27 +569,59 @@ void CommandHandler::handleKick(int clientSocket, const std::string& input, Clie
                     break;
                 }
             }
-            if (targetSocket == -1 || it->getMembers().find(targetSocket) == it->getMembers().end()) {
+
+            // Если ник не найден
+            if (targetSocket == -1) {
+                std::cout << "No client found with nick " << targetNick << std::endl;
+                std::string response = ":server 401 " + client.getNickname() + " " + targetNick + " :No such nick/channel\r\n";
+                client.appendOutputBuffer(response);
+                std::cout << "Sent response to " << client.getNickname() << ": " << response;
+                fds[i].events |= POLLOUT;
+                return;
+            }
+
+            // Проверяем, есть ли цель в канале
+            std::cout << "Checking if socket " << targetSocket << " is in channel " << channelName << ", members: " << it->getMembers().size() << std::endl;
+            std::map<int, bool> members = it->getMembers();
+            std::cout << "Current members: ";
+            for (std::map<int, bool>::const_iterator mit = members.begin(); mit != members.end(); ++mit) {
+                std::cout << mit->first << " ";
+            }
+            std::cout << std::endl;
+
+            if (members.find(targetSocket) == members.end()) {
+                std::cout << "Socket " << targetSocket << " not found in channel " << channelName << std::endl;
                 std::string response = ":server 441 " + client.getNickname() + " " + targetNick + " " + channelName + " :They aren't on that channel\r\n";
                 client.appendOutputBuffer(response);
                 fds[i].events |= POLLOUT;
                 return;
             }
+
+            // Выполняем кик
+            std::cout << "Socket " << targetSocket << " found, proceeding to kick" << std::endl;
             it->removeMember(targetSocket);
+
+            // Формируем сообщение о кике
             std::string response = ":" + client.getNickname() + "!" + client.getUsername() + "@localhost KICK " + channelName + " " + targetNick + " :" + reason + "\r\n";
-            std::cout << "Sending KICK to kicked client: " << targetSocket << std::endl;
-            server.m_clients[targetSocket].appendOutputBuffer(response);
-            for (size_t j = 0; j < fds.size(); ++j) {
-                if (fds[j].fd == targetSocket) {
-                    fds[j].events |= POLLOUT;
-                    break;
+
+            // Отправляем всем участникам канала, включая кикнутого
+            for (std::map<int, bool>::const_iterator memberIt = members.begin(); memberIt != members.end(); ++memberIt) {
+                std::cout << "Sending KICK to member: " << memberIt->first << std::endl;
+                server.m_clients[memberIt->first].appendOutputBuffer(response);
+                for (size_t j = 0; j < fds.size(); ++j) {
+                    if (fds[j].fd == memberIt->first) {
+                        fds[j].events |= POLLOUT;
+                        break;
+                    }
                 }
             }
-            broadcastMessage(clientSocket, "KICK " + channelName + " " + targetNick + " :" + reason, fds);
+
             fds[i].events |= POLLOUT;
             return;
         }
     }
+
+    // Если канал не найден
     std::string response = ":server 403 " + client.getNickname() + " " + channelName + " :No such channel\r\n";
     client.appendOutputBuffer(response);
     fds[i].events |= POLLOUT;

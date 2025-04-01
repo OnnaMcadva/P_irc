@@ -6,11 +6,11 @@ Channel::Channel(const std::string& n)
 
 void Channel::join(int clientSocket) {
     if (members.empty()) {
-        members[clientSocket] = true; // Перший учасник — оператор
+        members[clientSocket] = true;
     } else {
         members[clientSocket] = false;
     }
-    // Видаляємо з запрошених, якщо був
+
     for (std::vector<int>::iterator it = invited.begin(); it != invited.end(); ++it) {
         if (*it == clientSocket) {
             invited.erase(it);
@@ -30,16 +30,6 @@ void Channel::removeMember(int clientSocket) {
         }
     }
 }
-
-// void Channel::removeMember(int clientSocket) {
-//     members.erase(clientSocket);
-//     for (std::vector<int>::iterator it = invited.begin(); it != invited.end(); ++it) {
-//         if (*it == clientSocket) {
-//             invited.erase(it);
-//             break;
-//         }
-//     }
-// }
 
 std::string Channel::getName() const { return name; }
 

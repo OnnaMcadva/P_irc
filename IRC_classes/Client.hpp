@@ -15,8 +15,8 @@ public:
     void setNickname(const std::string& nick);
     std::string getUsername() const;
     void setUsername(const std::string& user);
-    std::string getRealname() const; // Добавляем геттер
-    void setRealname(const std::string& name); // Добавляем сеттер
+    std::string getRealname() const;
+    void setRealname(const std::string& name);
     std::string getInputBuffer() const;
     void appendInputBuffer(const std::string& data);
     void clearInputBuffer();
@@ -30,7 +30,7 @@ private:
     int passwordAttempts;
     std::string nickname;
     std::string username;
-    std::string realname; // Добавляем поле
+    std::string realname;
     std::string inputBuffer;
     std::string outputBuffer;
 };
