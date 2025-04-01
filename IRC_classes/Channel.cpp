@@ -1,4 +1,5 @@
 #include "Channel.hpp"
+#include <iostream>
 
 Channel::Channel(const std::string& n)
     : name(n), topic(""), inviteOnly(false), topicRestricted(false), key(""), userLimit(0) {}
@@ -19,7 +20,9 @@ void Channel::join(int clientSocket) {
 }
 
 void Channel::removeMember(int clientSocket) {
+    std::cout << "Removing socket " << clientSocket << " from channel " << name << ", members before: " << members.size() << std::endl;
     members.erase(clientSocket);
+    std::cout << "After removing socket " << clientSocket << ", members left: " << members.size() << std::endl;
     for (std::vector<int>::iterator it = invited.begin(); it != invited.end(); ++it) {
         if (*it == clientSocket) {
             invited.erase(it);
@@ -27,6 +30,16 @@ void Channel::removeMember(int clientSocket) {
         }
     }
 }
+
+// void Channel::removeMember(int clientSocket) {
+//     members.erase(clientSocket);
+//     for (std::vector<int>::iterator it = invited.begin(); it != invited.end(); ++it) {
+//         if (*it == clientSocket) {
+//             invited.erase(it);
+//             break;
+//         }
+//     }
+// }
 
 std::string Channel::getName() const { return name; }
 

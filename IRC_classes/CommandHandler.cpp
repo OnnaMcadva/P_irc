@@ -85,6 +85,7 @@ void CommandHandler::handlePassword(int clientSocket, const std::string& input, 
 /* This piece of code must remain untouched under any circumstances. */
 void CommandHandler::handleQuit(int clientSocket, Client& client, std::vector<pollfd>& fds) {
     std::cout << "Client requested to quit.\n";
+    (void)client;
 
     // std::string quitMessage = ":" + client.getNickname() + " QUIT :Quit\r\n";
     // for (std::map<int, Client>::iterator it = server.m_clients.begin(); it != server.m_clients.end(); ++it) {
@@ -314,13 +315,17 @@ void CommandHandler::handlePrivmsg(int clientSocket, const std::string& input, C
         std::string message = input.substr(colonPos + 1);
         std::cout << "Received private message to " << target << ": " << message << "\n";
 
-        // Проверка для каналов
         if (target[0] == '#') {
             bool isMember = false;
             for (std::vector<Channel>::iterator it = server.channels.begin(); it != server.channels.end(); ++it) {
                 if (it->getName() == target) {
-                    if (it->getMembers().find(clientSocket) != it->getMembers().end()) {
+                    std::map<int, bool> members = it->getMembers();
+                    std::cout << "Checking if socket " << clientSocket << " is in channel " << target << ", members: " << members.size() << std::endl;
+                    if (members.find(clientSocket) != members.end()) {
                         isMember = true;
+                        std::cout << "Socket " << clientSocket << " is a member of " << target << std::endl;
+                    } else {
+                        std::cout << "Socket " << clientSocket << " is NOT a member of " << target << std::endl;
                     }
                     break;
                 }
