@@ -629,7 +629,7 @@ void CommandHandler::handleKick(int clientSocket, const std::string& input, Clie
 
 void CommandHandler::handleInvite(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i) {
     if (input.length() <= 7) {
-        std::string response = ":server 461 " + client.getNickname() + " INVITE :Not enough parameters\r\n";
+        std::string response = ":server@localhost 461 " + client.getNickname() + " INVITE :Not enough parameters\r\n";
         client.appendOutputBuffer(response);
         fds[i].events |= POLLOUT;
         return;
@@ -637,7 +637,7 @@ void CommandHandler::handleInvite(int clientSocket, const std::string& input, Cl
     std::string params = input.substr(7);
     size_t spacePos = params.find(' ');
     if (spacePos == std::string::npos) {
-        std::string response = ":server 461 " + client.getNickname() + " INVITE :Not enough parameters\r\n";
+        std::string response = ":server@localhost 461 " + client.getNickname() + " INVITE :Not enough parameters\r\n";
         client.appendOutputBuffer(response);
         fds[i].events |= POLLOUT;
         return;
@@ -651,7 +651,7 @@ void CommandHandler::handleInvite(int clientSocket, const std::string& input, Cl
     for (std::vector<Channel>::iterator it = server.channels.begin(); it != server.channels.end(); ++it) {
         if (it->getName() == channelName) {
             if (!it->isOperator(clientSocket)) {
-                std::string response = ":server 482 " + client.getNickname() + " " + channelName + " :You're not channel operator\r\n";
+                std::string response = ":server@localhost 482 " + client.getNickname() + " " + channelName + " :You're not channel operator\r\n";
                 client.appendOutputBuffer(response);
                 fds[i].events |= POLLOUT;
                 return;
@@ -664,7 +664,7 @@ void CommandHandler::handleInvite(int clientSocket, const std::string& input, Cl
                 }
             }
             if (targetSocket == -1) {
-                std::string response = ":server 401 " + client.getNickname() + " " + targetNick + " :No such nick\r\n";
+                std::string response = ":server@localhost 401 " + client.getNickname() + " " + targetNick + " :No such nick/channel\r\n";
                 client.appendOutputBuffer(response);
                 fds[i].events |= POLLOUT;
                 return;
@@ -672,9 +672,9 @@ void CommandHandler::handleInvite(int clientSocket, const std::string& input, Cl
             it->invite(targetSocket);
             std::map<int, Client>::iterator targetIt = server.m_clients.find(targetSocket);
             if (targetIt != server.m_clients.end()) {
-                std::string response = ":" + client.getNickname() + /*[aka  + client.getUsername() + ]*/" INVITE " + targetNick + " :" + channelName + "\r\n";
+                std::string response = ":" + client.getNickname() + "!" + client.getUsername() + "@localhost INVITE " + targetNick + " :" + channelName + "\r\n";
                 targetIt->second.appendOutputBuffer(response);
-                client.appendOutputBuffer(":server 341 " + client.getNickname() + " " + targetNick + " " + channelName + "\r\n");
+                client.appendOutputBuffer(":server@localhost 341 " + client.getNickname() + " " + targetNick + " " + channelName + "\r\n");
                 fds[i].events |= POLLOUT;
                 for (size_t j = 0; j < fds.size(); ++j) {
                     if (fds[j].fd == targetSocket) {
@@ -686,7 +686,7 @@ void CommandHandler::handleInvite(int clientSocket, const std::string& input, Cl
             return;
         }
     }
-    std::string response = ":server 403 " + client.getNickname() + " " + channelName + " :No such channel\r\n";
+    std::string response = ":server@localhost 403 " + client.getNickname() + " " + channelName + " :No such channel\r\n";
     client.appendOutputBuffer(response);
     fds[i].events |= POLLOUT;
 }
