@@ -693,7 +693,7 @@ void CommandHandler::handleInvite(int clientSocket, const std::string& input, Cl
 
 void CommandHandler::handleTopic(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i) {
     if (input.length() <= 6) {
-        std::string response = ":server 461 " + client.getNickname() + " TOPIC :Not enough parameters\r\n";
+        std::string response = ":server@localhost 461 " + client.getNickname() + " TOPIC :Not enough parameters\r\n";
         client.appendOutputBuffer(response);
         fds[i].events |= POLLOUT;
         return;
@@ -709,26 +709,26 @@ void CommandHandler::handleTopic(int clientSocket, const std::string& input, Cli
             if (colonPos == std::string::npos) {
                 std::string topic = it->getTopic();
                 std::string response = topic.empty() ?
-                    ":server 331 " + client.getNickname() + " " + channelName + " :No topic is set\r\n" :
-                    ":server 332 " + client.getNickname() + " " + channelName + " :" + topic + "\r\n";
+                    ":server@localhost 331 " + client.getNickname() + " " + channelName + " :No topic is set\r\n" :
+                    ":server@localhost 332 " + client.getNickname() + " " + channelName + " :" + topic + "\r\n";
                 client.appendOutputBuffer(response);
                 fds[i].events |= POLLOUT;
             } else {
                 if (it->isTopicRestricted() && !it->isOperator(clientSocket)) {
-                    std::string response = ":server 482 " + client.getNickname() + " " + channelName + " :You're not channel operator\r\n";
+                    std::string response = ":server@localhost 482 " + client.getNickname() + " " + channelName + " :You're not channel operator\r\n";
                     client.appendOutputBuffer(response);
                     fds[i].events |= POLLOUT;
                     return;
                 }
                 std::string newTopic = params.substr(colonPos + 1);
                 it->setTopic(newTopic);
-                broadcastMessage(clientSocket, "TOPIC " + channelName + " :" + newTopic, fds);
+                broadcastMessage(clientSocket, ":" + client.getNickname() + "!" + client.getUsername() + "@localhost TOPIC " + channelName + " :" + newTopic, fds);
                 fds[i].events |= POLLOUT;
             }
             return;
         }
     }
-    std::string response = ":server 403 " + client.getNickname() + " " + channelName + " :No such channel\r\n";
+    std::string response = ":server@localhost 403 " + client.getNickname() + " " + channelName + " :No such channel\r\n";
     client.appendOutputBuffer(response);
     fds[i].events |= POLLOUT;
 }
