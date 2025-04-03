@@ -27,9 +27,9 @@ Server::~Server() {
 
 bool Server::initialize() {
     std::cout << "Initializing server on port " << config.getPort() << " with password " << config.getPassword() << "\n";
-    signal(SIGHUP, Server::signalHandler);  /* Защита от закрытия терминала */
-    signal(SIGINT, Server::signalHandler);  /* Защита от Ctrl+C */
-    signal(SIGTERM, Server::signalHandler); /* Защита от kill */
+    signal(SIGHUP, Server::signalHandler);  /* terminal closing */
+    signal(SIGINT, Server::signalHandler);  /* Ctrl+C */
+    signal(SIGTERM, Server::signalHandler); /* ps -aux | grep ircserv, kill <PID>/kill -TERM <PID> */
     return setupSocket();
 }
 
