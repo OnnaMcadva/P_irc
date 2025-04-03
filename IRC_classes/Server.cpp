@@ -27,13 +27,14 @@ Server::~Server() {
 
 bool Server::initialize() {
     std::cout << "Initializing server on port " << config.getPort() << " with password " << config.getPassword() << "\n";
-    signal(SIGHUP, Server::signalHandler); /* Защита от закрытия терминала с сервером */
-    signal(SIGINT, Server::signalHandler);  /* Защита от Ctrl+C или от kill -INT <pid> */
+    signal(SIGHUP, Server::signalHandler);  /* Защита от закрытия терминала */
+    signal(SIGINT, Server::signalHandler);  /* Защита от Ctrl+C */
+    signal(SIGTERM, Server::signalHandler); /* Защита от kill */
     return setupSocket();
 }
 
 void Server::signalHandler(int sig) {
-    if (sig == SIGINT || sig == SIGHUP) {
+    if (sig == SIGINT || sig == SIGHUP || sig == SIGTERM) {
         shouldStop = true;
     }
 }
