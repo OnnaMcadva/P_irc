@@ -692,45 +692,112 @@ void CommandHandler::handleInvite(int clientSocket, const std::string& input, Cl
 }
 
 void CommandHandler::handleTopic(int clientSocket, const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i) {
-    if (input.length() <= 6) {
+    // Parse the input: TOPIC <channel> [:<topic>]
+    std::string params = input.substr(6); // Skip "TOPIC "
+    if (params.empty()) {
         std::string response = ":server@localhost 461 " + client.getNickname() + " TOPIC :Not enough parameters\r\n";
         client.appendOutputBuffer(response);
         fds[i].events |= POLLOUT;
         return;
     }
-    std::string params = input.substr(6);
-    size_t colonPos = params.find(':');
-    std::string channelName = colonPos == std::string::npos ? params : params.substr(0, colonPos);
-    while (!channelName.empty() && (channelName[0] == ' ' || channelName[channelName.length() - 1] == ' '))
-        channelName.erase(channelName[0] == ' ' ? 0 : channelName.length() - 1, 1);
 
+    // Extract channel name and optional topic
+    std::string channelName;
+    std::string newTopic;
+    size_t colonPos = params.find(':');
+    if (colonPos == std::string::npos) {
+        channelName = params;
+    } else {
+        channelName = params.substr(0, colonPos);
+        newTopic = params.substr(colonPos + 1);
+    }
+
+    // Trim whitespace from channel name
+    while (!channelName.empty() && (channelName[0] == ' ' || channelName[channelName.length() - 1] == ' ')) {
+        channelName.erase(channelName[0] == ' ' ? 0 : channelName.length() - 1, 1);
+    }
+
+    // Validate channel name (must start with #)
+    if (channelName.empty() || channelName[0] != '#') {
+        std::string response = ":server@localhost 403 " + client.getNickname() + " " + channelName + " :No such channel\r\n";
+        client.appendOutputBuffer(response);
+        fds[i].events |= POLLOUT;
+        return;
+    }
+
+    // Find the channel
+    std::vector<Channel>::iterator channelIt = server.channels.end();
     for (std::vector<Channel>::iterator it = server.channels.begin(); it != server.channels.end(); ++it) {
         if (it->getName() == channelName) {
-            if (colonPos == std::string::npos) {
-                std::string topic = it->getTopic();
-                std::string response = topic.empty() ?
-                    ":server@localhost 331 " + client.getNickname() + " " + channelName + " :No topic is set\r\n" :
-                    ":server@localhost 332 " + client.getNickname() + " " + channelName + " :" + topic + "\r\n";
-                client.appendOutputBuffer(response);
-                fds[i].events |= POLLOUT;
-            } else {
-                if (it->isTopicRestricted() && !it->isOperator(clientSocket)) {
-                    std::string response = ":server@localhost 482 " + client.getNickname() + " " + channelName + " :You're not channel operator\r\n";
-                    client.appendOutputBuffer(response);
-                    fds[i].events |= POLLOUT;
-                    return;
-                }
-                std::string newTopic = params.substr(colonPos + 1);
-                it->setTopic(newTopic);
-                broadcastMessage(clientSocket, ":" + client.getNickname() + "!" + client.getUsername() + "@localhost TOPIC " + channelName + " :" + newTopic, fds);
-                fds[i].events |= POLLOUT;
-            }
-            return;
+            channelIt = it;
+            break;
         }
     }
-    std::string response = ":server@localhost 403 " + client.getNickname() + " " + channelName + " :No such channel\r\n";
-    client.appendOutputBuffer(response);
-    fds[i].events |= POLLOUT;
+
+    // Check if channel exists
+    if (channelIt == server.channels.end()) {
+        std::string response = ":server@localhost 403 " + client.getNickname() + " " + channelName + " :No such channel\r\n";
+        client.appendOutputBuffer(response);
+        fds[i].events |= POLLOUT;
+        return;
+    }
+
+    // Check if client is a member of the channel
+    if (!channelIt->isOperator(clientSocket)) {
+        std::string response = ":server@localhost 442 " + client.getNickname() + " " + channelName + " :You're not on that channel\r\n";
+        client.appendOutputBuffer(response);
+        fds[i].events |= POLLOUT;
+        return;
+    }
+
+    // Handle topic viewing or setting
+    if (colonPos == std::string::npos) {
+        // View topic
+        std::string topic = channelIt->getTopic();
+        std::string response;
+        if (topic.empty()) {
+            response = ":server@localhost 331 " + client.getNickname() + " " + channelName + " :No topic is set\r\n";
+        } else {
+            response = ":server@localhost 332 " + client.getNickname() + " " + channelName + " :" + topic + "\r\n";
+            // Optionally add RPL_TOPICWHOTIME (333) if you store topic setter and timestamp
+        }
+        client.appendOutputBuffer(response);
+        fds[i].events |= POLLOUT;
+    } else {
+        // Set topic
+        if (channelIt->isTopicRestricted() && !channelIt->isOperator(clientSocket)) {
+            std::string response = ":server@localhost 482 " + client.getNickname() + " " + channelName + " :You're not channel operator\r\n";
+            client.appendOutputBuffer(response);
+            fds[i].events |= POLLOUT;
+            return;
+        }
+
+        // Trim trailing whitespace from new topic
+        while (!newTopic.empty() && newTopic[newTopic.length() - 1] == ' ') {
+            newTopic.erase(newTopic.length() - 1, 1);
+        }
+
+        // Set the new topic
+        channelIt->setTopic(newTopic);
+
+        // Broadcast the topic change to all channel members
+        std::string message = ":" + client.getNickname() + "!" + client.getUsername() + "@localhost TOPIC " + channelName + " :" + newTopic + "\r\n";
+        const std::map<int, bool>& members = channelIt->getMembers();
+        for (std::map<int, bool>::const_iterator it = members.begin(); it != members.end(); ++it) {
+            int memberSocket = it->first;
+            std::map<int, Client>::iterator clientIt = server.m_clients.find(memberSocket);
+            if (clientIt != server.m_clients.end()) {
+                clientIt->second.appendOutputBuffer(message);
+                // Find the corresponding pollfd to enable POLLOUT
+                for (size_t j = 0; j < fds.size(); ++j) {
+                    if (fds[j].fd == memberSocket) {
+                        fds[j].events |= POLLOUT;
+                        break;
+                    }
+                }
+            }
+        }
+    }
 }
 
 void CommandHandler::handleUnknownCommand(const std::string& input, Client& client, std::vector<pollfd>& fds, size_t i) {

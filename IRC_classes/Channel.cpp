@@ -29,8 +29,19 @@ void Channel::removeMember(int clientSocket) {
             break;
         }
     }
+    bool hasOperator = false;
+    for (std::map<int, bool>::iterator it = members.begin(); it != members.end(); ++it) {
+        if (it->second == true) {
+            hasOperator = true;
+            break;
+        }
+    }
+    if (!hasOperator && !members.empty()) {
+        std::map<int, bool>::iterator firstMember = members.begin();
+        setOperator(firstMember->first, true);
+        std::cout << "Promoted client " << firstMember->first << " to operator in channel " << name << std::endl;
+    }
 }
-
 std::string Channel::getName() const { return name; }
 
 std::map<int, bool> Channel::getMembers() const { return members; }

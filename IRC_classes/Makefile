@@ -60,6 +60,9 @@ $(NAME): $(OBJS)
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
+go:
+	./ircserv 1111 jopa
+
 clean:
 	rm -f $(OBJS)
 
